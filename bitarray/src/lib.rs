@@ -2,9 +2,11 @@
 mod arbitrary;
 mod block;
 
+use std::ops;
+
 use block::BitArrayBlock;
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct BitArray<const BLOCK_COUNT: usize, Block: BitArrayBlock = u64> {
     // blocks are stored in reverse order
     blocks: [Block; BLOCK_COUNT],
@@ -69,45 +71,6 @@ impl<const BLOCK_COUNT: usize, Block: BitArrayBlock> BitArray<BLOCK_COUNT, Block
         None
     }
 
-    pub fn rsh(&mut self, n: usize) {
-        if n == 0 {
-            return;
-        }
-
-        let shift_overflow_mask = !(Block::all() << n);
-        let mut shift_overflow: [Block; BLOCK_COUNT] = [Block::empty(); BLOCK_COUNT];
-        for i in 1..BLOCK_COUNT {
-            shift_overflow[i] = self.blocks[i - 1] & shift_overflow_mask;
-        }
-
-        for i in 0..BLOCK_COUNT {
-            self.blocks[i] = self.blocks[i].shr(n);
-        }
-        for i in 1..BLOCK_COUNT {
-            self.blocks[i] |= shift_overflow[i] << (Block::BLOCK_LENGTH - n)
-        }
-    }
-
-    pub fn lsh(&mut self, n: usize) {
-        if n == 0 {
-            return;
-        }
-
-        let shift_overflow_mask = !(Block::all() >> n);
-        let mut shift_overflow: [Block; BLOCK_COUNT] = [Block::empty(); BLOCK_COUNT];
-        for i in 0..(BLOCK_COUNT - 1) {
-            shift_overflow[i] = self.blocks[i + 1] & shift_overflow_mask;
-        }
-
-        for i in 0..BLOCK_COUNT {
-            self.blocks[i] = self.blocks[i].shl(n);
-        }
-
-        for i in 0..(BLOCK_COUNT - 1) {
-            self.blocks[i] |= shift_overflow[i] >> (Block::BLOCK_LENGTH - n)
-        }
-    }
-
     pub fn bits(&self) -> usize {
         Block::BLOCK_LENGTH * BLOCK_COUNT
     }
@@ -137,9 +100,142 @@ impl<const BLOCK_COUNT: usize, Block: BitArrayBlock> std::fmt::Debug
     }
 }
 
+// #region Bit Ops
+impl<const N: usize, B: BitArrayBlock> ops::BitAnd for BitArray<N, B> {
+    type Output = Self;
+
+    fn bitand(mut self, Self { blocks }: Self) -> Self::Output {
+        self.blocks
+            .iter_mut()
+            .zip(blocks.into_iter())
+            .for_each(|(lhs, rhs)| *lhs &= rhs);
+        self
+    }
+}
+impl<const N: usize, B: BitArrayBlock> ops::BitOr for BitArray<N, B> {
+    type Output = Self;
+
+    fn bitor(mut self, Self { blocks }: Self) -> Self::Output {
+        self.blocks
+            .iter_mut()
+            .zip(blocks.into_iter())
+            .for_each(|(lhs, rhs)| *lhs |= rhs);
+        self
+    }
+}
+impl<const N: usize, B: BitArrayBlock> ops::BitXor for BitArray<N, B> {
+    type Output = Self;
+
+    fn bitxor(mut self, Self { blocks }: Self) -> Self::Output {
+        self.blocks
+            .iter_mut()
+            .zip(blocks.into_iter())
+            .for_each(|(lhs, rhs)| *lhs ^= rhs);
+        self
+    }
+}
+// #endregion
+
+// #region Bit Ops Assign
+impl<const N: usize, B: BitArrayBlock> ops::BitAndAssign for BitArray<N, B> {
+    fn bitand_assign(&mut self, Self { blocks }: Self) {
+        self.blocks
+            .iter_mut()
+            .zip(blocks.into_iter())
+            .for_each(|(lhs, rhs)| *lhs &= rhs);
+    }
+}
+impl<const N: usize, B: BitArrayBlock> ops::BitOrAssign for BitArray<N, B> {
+    fn bitor_assign(&mut self, Self { blocks }: Self) {
+        self.blocks
+            .iter_mut()
+            .zip(blocks.into_iter())
+            .for_each(|(lhs, rhs)| *lhs |= rhs);
+    }
+}
+impl<const N: usize, B: BitArrayBlock> ops::BitXorAssign for BitArray<N, B> {
+    fn bitxor_assign(&mut self, Self { blocks }: Self) {
+        self.blocks
+            .iter_mut()
+            .zip(blocks.into_iter())
+            .for_each(|(lhs, rhs)| *lhs ^= rhs);
+    }
+}
+// #endregion
+
+// #region Shift Ops Assign
+impl<const BLOCK_COUNT: usize, Block: BitArrayBlock> ops::ShlAssign<usize>
+    for BitArray<BLOCK_COUNT, Block>
+{
+    fn shl_assign(&mut self, n: usize) {
+        if n == 0 {
+            return;
+        }
+
+        let shift_overflow_mask = !(Block::all() >> n);
+        let mut shift_overflow: [Block; BLOCK_COUNT] = [Block::empty(); BLOCK_COUNT];
+        for i in 0..(BLOCK_COUNT - 1) {
+            shift_overflow[i] = self.blocks[i + 1] & shift_overflow_mask;
+        }
+
+        for i in 0..BLOCK_COUNT {
+            self.blocks[i] = self.blocks[i].shl(n);
+        }
+
+        for i in 0..(BLOCK_COUNT - 1) {
+            self.blocks[i] |= shift_overflow[i] >> (Block::BLOCK_LENGTH - n)
+        }
+    }
+}
+
+impl<const BLOCK_COUNT: usize, Block: BitArrayBlock> ops::ShrAssign<usize>
+    for BitArray<BLOCK_COUNT, Block>
+{
+    fn shr_assign(&mut self, n: usize) {
+        if n == 0 {
+            return;
+        }
+
+        let shift_overflow_mask = !(Block::all() << n);
+        let mut shift_overflow: [Block; BLOCK_COUNT] = [Block::empty(); BLOCK_COUNT];
+        for i in 1..BLOCK_COUNT {
+            shift_overflow[i] = self.blocks[i - 1] & shift_overflow_mask;
+        }
+
+        for i in 0..BLOCK_COUNT {
+            self.blocks[i] = self.blocks[i].shr(n);
+        }
+
+        for i in 1..BLOCK_COUNT {
+            self.blocks[i] |= shift_overflow[i] << (Block::BLOCK_LENGTH - n)
+        }
+    }
+}
+// #endregion
+
+// #region Shift Ops
+impl<const N: usize, B: BitArrayBlock> ops::Shl<usize> for BitArray<N, B> {
+    type Output = Self;
+
+    fn shl(mut self, n: usize) -> Self::Output {
+        ops::ShlAssign::shl_assign(&mut self, n);
+        self
+    }
+}
+
+impl<const N: usize, B: BitArrayBlock> ops::Shr<usize> for BitArray<N, B> {
+    type Output = Self;
+
+    fn shr(mut self, n: usize) -> Self::Output {
+        ops::ShrAssign::shr_assign(&mut self, n);
+        self
+    }
+}
+// #endregion
+
 #[cfg(test)]
 mod test {
-    use proptest::{prelude::any, prop_assert, proptest};
+    use proptest::{prelude::any, prop_assert, prop_assert_eq, proptest};
 
     use crate::BitArray;
 
@@ -196,7 +292,7 @@ mod test {
             blocks: [0b00011000u8],
         };
 
-        b1_u8.rsh(1);
+        b1_u8 >>= 1;
 
         assert_eq!(b1_u8.blocks, [0b00001100u8]);
     }
@@ -207,22 +303,22 @@ mod test {
             blocks: [0b00000001u8, 0b00000000u8],
         };
 
-        overflow.rsh(1);
+        overflow >>= 1;
         assert_eq!(overflow.blocks, [0b00000000u8, 0b10000000u8]);
 
         let mut overflow2 = BitArray {
             blocks: [0b00000001u8, 0b00000000u8],
         };
 
-        overflow2.rsh(3);
+        overflow2 >>= 3;
         assert_eq!(overflow2.blocks, [0b00000000u8, 0b00100000u8]);
     }
 
     proptest! {
         #[test]
-        fn rhs_u64_2(bit_arr in any::<BitArray<2, u64>>(), shift in 0usize..64) {
+        fn right_shift_u64x2(bit_arr in any::<BitArray<2, u64>>(), shift in 0usize..64) {
             let mut shifted = bit_arr.clone();
-            shifted.rsh(shift);
+            shifted >>= shift;
 
             for i in (bit_arr.bits() - shift)..bit_arr.bits() {
                 prop_assert!(!shifted.get(i), "expected zero to be shifted in at pos {i}\n  shifted  = {shifted:?}\n  original = {bit_arr:?}");
@@ -234,9 +330,9 @@ mod test {
         }
 
         #[test]
-        fn lhs_u64_2(bit_arr in any::<BitArray<2, u64>>(), shift in 0usize..64) {
+        fn left_shift_u64x2(bit_arr in any::<BitArray<2, u64>>(), shift in 0usize..64) {
             let mut shifted = bit_arr.clone();
-            shifted.lsh(shift);
+            shifted <<= shift;
 
             for i in 0..shift {
                 prop_assert!(!shifted.get(i), "expected zero to be shifted in at pos {i}\n  shifted  = {shifted:?}\n  original = {bit_arr:?}");
@@ -245,6 +341,26 @@ mod test {
             for i in shift..bit_arr.bits() {
                 prop_assert!(bit_arr.get(i - shift) == shifted.get(i), "shift mismatch at pos {i}\n  shifted  = {shifted:?}\n  original = {bit_arr:?}");
             }
+        }
+
+
+        #[test]
+        fn bit_ops_u64x2(lhs in any::<BitArray<2, u64>>(), rhs in any::<BitArray<2, u64>>()) {
+            let l0 = lhs.blocks[0];
+            let l1 = lhs.blocks[1];
+
+            let r0 = rhs.blocks[0];
+            let r1 = rhs.blocks[1];
+
+            // check equivalence to manual impl
+            prop_assert_eq!((lhs.clone() & rhs.clone()).blocks, [l0 & r0, l1 & r1]);
+            prop_assert_eq!((lhs.clone() | rhs.clone()).blocks, [l0 | r0, l1 | r1]);
+            prop_assert_eq!((lhs.clone() ^ rhs.clone()).blocks, [l0 ^ r0, l1 ^ r1]);
+
+            // check commutative
+            prop_assert_eq!(lhs.clone() & rhs.clone(), rhs.clone() & lhs.clone());
+            prop_assert_eq!(lhs.clone() | rhs.clone(), rhs.clone() | lhs.clone());
+            prop_assert_eq!(lhs.clone() ^ rhs.clone(), rhs.clone() ^ lhs.clone());
         }
     }
 }
