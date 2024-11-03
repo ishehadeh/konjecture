@@ -14,22 +14,21 @@ pub enum TileState {
 
 impl Konane18x18 {
     pub fn empty() -> Self {
-        let mut row_end_sigils = BitArray::new();
-        for i in 1..18 {
-            row_end_sigils.set(i * 18);
-        }
-        row_end_sigils.set(17 * 18 + 1);
+        let mut base = BitArray::new();
+        base.set_range(18 * 18..base.bits());
 
         Self {
-            white: row_end_sigils.clone(),
-            black: row_end_sigils,
+            white: base.clone(),
+            black: base,
         }
     }
+
     pub fn small((rows, cols): (usize, usize), tiles: &[TileState]) -> Self {
         let row_start = (18 - rows) / 2;
         let col_start = (18 - cols) / 2;
         Self::small_at((row_start, col_start), (rows, cols), tiles)
     }
+
     pub fn small_at(
         (x_start, y_start): (usize, usize),
         (rows, columns): (usize, usize),
@@ -76,7 +75,7 @@ impl Konane18x18 {
 
     fn bit_index_of(x: usize, y: usize) -> usize {
         // account for row end sigils
-        x + 19 * y
+        x + 18 * y
     }
 
     pub fn set_tile(&mut self, x: usize, y: usize, state: TileState) {
@@ -119,23 +118,47 @@ impl Konane18x18 {
     }
 
     pub fn white_moves_right(&self) -> MoveIter<'_, true> {
-        MoveIter {
-            board: &self,
-            moveset: self.white.clone(),
-        }
+        MoveIter::new_white(self)
     }
 
     pub fn black_moves_right(&self) -> MoveIter<'_, false> {
-        MoveIter {
-            board: &self,
-            moveset: self.black.clone(),
+        MoveIter::new_black(self)
+    }
+
+    /// Get a bitboard with only the last tile in every row set to 1
+    pub fn right_border_mask() -> BitArray<6, u64> {
+        let mut mask = BitArray::new();
+        for i in 1..18 {
+            mask.set(i * 18 - 1);
         }
+
+        mask
     }
 }
 
 pub struct MoveIter<'a, const IS_WHITE: bool> {
     board: &'a Konane18x18,
     moveset: BitArray<6, u64>,
+}
+
+impl<'a> MoveIter<'a, true> {
+    pub fn new_white(board: &'a Konane18x18) -> Self {
+        let initial = !Konane18x18::right_border_mask() & &board.white;
+        MoveIter {
+            board,
+            moveset: initial,
+        }
+    }
+}
+
+impl<'a> MoveIter<'a, false> {
+    pub fn new_black(board: &'a Konane18x18) -> Self {
+        let initial = !Konane18x18::right_border_mask() & &board.black;
+        MoveIter {
+            board,
+            moveset: initial,
+        }
+    }
 }
 
 impl<'a, const IS_WHITE: bool> Iterator for MoveIter<'a, IS_WHITE> {
@@ -154,7 +177,7 @@ impl<'a, const IS_WHITE: bool> Iterator for MoveIter<'a, IS_WHITE> {
                 self.moveset &= &self.board.white;
             }
 
-            // 2. verify there's an empty piece to the right 2 spaces
+            // 2. verify there's an empty tile to the right 2 spaces
             self.moveset <<= 1;
             self.moveset &= self.board.empty_spaces();
 
@@ -176,20 +199,8 @@ mod test {
     #[test]
     pub fn checkerboard() {
         let board = Konane18x18::checkerboard();
-        dbg!(&board.white);
-        dbg!(&board.black);
-        for i in 0..(18 * 19 - 1) {
-            if i % 18 == 0 && i > 0 {
-                // row end sigil
-                assert_eq!(board.black.get(i), true);
-                assert_eq!(board.white.get(i), true);
-            } else if (i + 1) % 18 == 0 && i > 0 {
-                // last element of row differs from first of row below
-                assert_eq!(board.black.get(i), board.white.get(i + 2), "i = {i}");
-            } else {
-                // alternating pattern in rows
-                assert_eq!(board.black.get(i), board.white.get(i + 1));
-            }
+        for i in 0..(18 * 18 - 1) {
+            assert_eq!(board.black.get(i), board.white.get(i + 1));
         }
     }
 
