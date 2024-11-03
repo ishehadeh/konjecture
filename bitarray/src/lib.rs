@@ -74,6 +74,10 @@ impl<const BLOCK_COUNT: usize, Block: BitArrayBlock> BitArray<BLOCK_COUNT, Block
     pub fn bits(&self) -> usize {
         Block::BLOCK_LENGTH * BLOCK_COUNT
     }
+
+    pub fn is_empty(&self) -> bool {
+        self.blocks.iter().all(|&b| b == Block::empty())
+    }
 }
 
 impl<const BLOCK_COUNT: usize, Block: BitArrayBlock> Default for BitArray<BLOCK_COUNT, Block> {
@@ -163,6 +167,69 @@ impl<const N: usize, B: BitArrayBlock> ops::BitXorAssign for BitArray<N, B> {
 }
 // #endregion
 
+// #region Bit Ops Ref
+impl<'a, const N: usize, B: BitArrayBlock> ops::BitAnd<&'a Self> for BitArray<N, B> {
+    type Output = Self;
+
+    fn bitand(mut self, Self { blocks }: &Self) -> Self::Output {
+        self.blocks
+            .iter_mut()
+            .zip(blocks.iter())
+            .for_each(|(lhs, rhs)| *lhs &= *rhs);
+        self
+    }
+}
+impl<'a, const N: usize, B: BitArrayBlock> ops::BitOr<&'a Self> for BitArray<N, B> {
+    type Output = Self;
+
+    fn bitor(mut self, Self { blocks }: &Self) -> Self::Output {
+        self.blocks
+            .iter_mut()
+            .zip(blocks.iter())
+            .for_each(|(lhs, rhs)| *lhs |= *rhs);
+        self
+    }
+}
+impl<'a, const N: usize, B: BitArrayBlock> ops::BitXor<&'a Self> for BitArray<N, B> {
+    type Output = Self;
+
+    fn bitxor(mut self, Self { blocks }: &Self) -> Self::Output {
+        self.blocks
+            .iter_mut()
+            .zip(blocks.iter())
+            .for_each(|(lhs, rhs)| *lhs ^= *rhs);
+        self
+    }
+}
+// #endregion
+
+// #region Bit Ops Assign Ref
+impl<'a, const N: usize, B: BitArrayBlock> ops::BitAndAssign<&'a Self> for BitArray<N, B> {
+    fn bitand_assign(&mut self, Self { blocks }: &Self) {
+        self.blocks
+            .iter_mut()
+            .zip(blocks.iter())
+            .for_each(|(lhs, rhs)| *lhs &= *rhs);
+    }
+}
+impl<'a, const N: usize, B: BitArrayBlock> ops::BitOrAssign<&'a Self> for BitArray<N, B> {
+    fn bitor_assign(&mut self, Self { blocks }: &Self) {
+        self.blocks
+            .iter_mut()
+            .zip(blocks.iter())
+            .for_each(|(lhs, rhs)| *lhs |= *rhs);
+    }
+}
+impl<'a, const N: usize, B: BitArrayBlock> ops::BitXorAssign<&'a Self> for BitArray<N, B> {
+    fn bitxor_assign(&mut self, Self { blocks }: &Self) {
+        self.blocks
+            .iter_mut()
+            .zip(blocks.iter())
+            .for_each(|(lhs, rhs)| *lhs ^= *rhs);
+    }
+}
+// #endregion
+
 // #region Shift Ops Assign
 impl<const BLOCK_COUNT: usize, Block: BitArrayBlock> ops::ShlAssign<usize>
     for BitArray<BLOCK_COUNT, Block>
@@ -232,6 +299,15 @@ impl<const N: usize, B: BitArrayBlock> ops::Shr<usize> for BitArray<N, B> {
     }
 }
 // #endregion
+
+impl<const N: usize, B: BitArrayBlock> ops::Not for BitArray<N, B> {
+    type Output = Self;
+
+    fn not(mut self) -> Self::Output {
+        self.blocks.iter_mut().for_each(|b| *b = !(*b));
+        self
+    }
+}
 
 #[cfg(test)]
 mod test {
