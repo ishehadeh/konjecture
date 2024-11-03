@@ -40,6 +40,32 @@ impl<const BLOCK_COUNT: usize, Block: BitArrayBlock> BitArray<BLOCK_COUNT, Block
         self.blocks[block].set(bit);
     }
 
+    pub fn set_range(&mut self, range: std::ops::Range<usize>) {
+        if range.start == range.end {
+            return;
+        }
+
+        let (start_block, start_bit) = Self::addr(range.start);
+        let (end_block, end_bit) = Self::addr(range.end);
+
+        if start_block == end_block {
+            let bits =
+                (!Block::empty() >> (Block::BLOCK_LENGTH - (end_bit - start_bit))) << start_bit;
+            self.blocks[start_block] |= bits;
+        } else {
+            if start_block + 1 > end_block {
+                for i in (end_block + 1)..start_block {
+                    self.blocks[i] = !Block::empty();
+                }
+            }
+
+            self.blocks[start_block] |= !Block::empty() << start_bit;
+            if end_bit > 0 {
+                self.blocks[end_block] |= !Block::empty() >> (Block::BLOCK_LENGTH - end_bit);
+            }
+        }
+    }
+
     pub fn clear(&mut self, bit: usize) {
         let (block, bit) = Self::addr(bit);
         self.blocks[block].clear(bit)
@@ -416,6 +442,23 @@ mod test {
 
             for i in shift..bit_arr.bits() {
                 prop_assert!(bit_arr.get(i - shift) == shifted.get(i), "shift mismatch at pos {i}\n  shifted  = {shifted:?}\n  original = {bit_arr:?}");
+            }
+        }
+
+        #[test]
+        fn set_range_u64x4(a in 0usize..(64 * 4), b in 0usize..(64 * 4)) {
+            let lo = a.min(b);
+            let hi = a.max(b);
+
+            let mut arr = BitArray::<4, u64>::new();
+            arr.set_range(lo..hi);
+
+            for i in 0usize..(64 * 4) {
+                if i >= lo && i < hi {
+                    prop_assert!(arr.get(i), "element in range not set: i={i}, range={lo}..{hi}\n  arr = {arr:?}");
+                } else {
+                    prop_assert!(!arr.get(i), "element outside of range set: i={i}, range={lo}..{hi}\n  arr = {arr:?}");
+                }
             }
         }
 
