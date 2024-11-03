@@ -1,2 +1,3 @@
 [workspace]
-members = ["bitstr"]
+members = ["bitarray"]
+resolver = "2"

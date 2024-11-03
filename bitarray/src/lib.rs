@@ -97,12 +97,18 @@ impl_bit_array_block!(u8, bits = 8);
 impl_bit_array_block!(u16, bits = 16);
 impl_bit_array_block!(u32, bits = 32);
 impl_bit_array_block!(u64, bits = 64);
+impl_bit_array_block!(u128, bits = 128);
 impl_bit_array_block!(usize, bits = usize::BITS as usize);
 
 #[derive(Clone)]
 pub struct BitArray<const BLOCK_COUNT: usize, Block: BitArrayBlock = u64> {
     // blocks are stored in reverse order
     blocks: [Block; BLOCK_COUNT],
+}
+
+pub fn test_asm(mut arr: BitArray<4>) -> BitArray<4> {
+    arr.lsh(1);
+    arr
 }
 
 impl<const BLOCK_COUNT: usize, Block: BitArrayBlock> BitArray<BLOCK_COUNT, Block> {
