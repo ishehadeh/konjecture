@@ -46,11 +46,11 @@ impl<const BLOCK_COUNT: usize, Block: BitArrayBlock> BitArray<BLOCK_COUNT, Block
         }
 
         let (start_block, start_bit) = Self::addr(range.start);
-        let (end_block, end_bit) = Self::addr(range.end);
+        let (end_block, end_bit) = Self::addr(range.end - 1);
 
         if start_block == end_block {
             let bits =
-                (!Block::empty() >> (Block::BLOCK_LENGTH - (end_bit - start_bit))) << start_bit;
+                (!Block::empty() >> (Block::BLOCK_LENGTH - (end_bit + 1 - start_bit))) << start_bit;
             self.blocks[start_block] |= bits;
         } else {
             if start_block + 1 > end_block {
@@ -60,9 +60,7 @@ impl<const BLOCK_COUNT: usize, Block: BitArrayBlock> BitArray<BLOCK_COUNT, Block
             }
 
             self.blocks[start_block] |= !Block::empty() << start_bit;
-            if end_bit > 0 {
-                self.blocks[end_block] |= !Block::empty() >> (Block::BLOCK_LENGTH - end_bit);
-            }
+            self.blocks[end_block] |= !Block::empty() >> (Block::BLOCK_LENGTH - (end_bit + 1));
         }
     }
 
@@ -414,6 +412,13 @@ mod test {
 
         overflow2 >>= 3;
         assert_eq!(overflow2.blocks, [0b00000000u8, 0b00100000u8]);
+    }
+
+    #[test]
+    fn set_range_full() {
+        let mut all: BitArray<4> = BitArray::new();
+        all.set_range(0..all.bits());
+        assert_eq!(all, !BitArray::new())
     }
 
     proptest! {
