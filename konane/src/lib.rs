@@ -230,4 +230,18 @@ mod test {
         assert_eq!(white, vec![white_expected]);
         assert_eq!(black, vec![]);
     }
+
+    #[test]
+    pub fn moveset_black_right_jump() {
+        use crate::TileState::{Black, White};
+
+        let board = Konane18x18::small_at((0, 0), (1, 2), &[Black, White]);
+        let white = board.white_moves_right().collect::<Vec<_>>();
+        let black = board.black_moves_right().collect::<Vec<_>>();
+
+        let mut black_expected = BitArray::new();
+        black_expected.set(Konane18x18::bit_index_of(2, 0));
+        assert_eq!(black, vec![black_expected]);
+        assert_eq!(white, vec![]);
+    }
 }
