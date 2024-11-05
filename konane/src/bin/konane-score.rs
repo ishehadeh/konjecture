@@ -58,12 +58,16 @@ impl GameAnalyzer {
         for dir in Direction::all() {
             let w_move_set = game.moveset(true, dir);
             for move_i in w_move_set.board.iter_set() {
-                let take_piece = move_i as isize + 1 * dir.x() + 16 * dir.y();
-                let jumping_piece = move_i as isize + 2 * dir.x() + 32 * dir.y();
                 let mut moved = game.clone();
                 moved.white.board.set(move_i);
-                moved.black.board.clear(take_piece as usize);
-                moved.white.board.clear(jumping_piece as usize);
+
+                let mut clear_i = move_i as isize + 1 * dir.x() + 16 * dir.y();
+                while !moved.white.board.get(clear_i as usize) {
+                    moved.black.board.clear(clear_i as usize);
+                    clear_i += 1 * dir.x() + 16 * dir.y();
+                }
+                moved.white.board.clear(clear_i as usize);
+
                 if let Some(GameAnalysisState::Complete(c)) = self.states.get(&moved) {
                     white_moves.insert(*c);
                 } else {
@@ -74,12 +78,14 @@ impl GameAnalyzer {
 
             let b_move_set = game.moveset(false, dir);
             for move_i in b_move_set.board.iter_set() {
-                let take_piece = move_i as isize + 1 * dir.x() + 16 * dir.y();
-                let jumping_piece = move_i as isize + 2 * dir.x() + 32 * dir.y();
                 let mut moved = game.clone();
-                moved.black.board.set(move_i);
-                moved.white.board.clear(take_piece as usize);
-                moved.black.board.clear(jumping_piece as usize);
+                let mut clear_i = move_i as isize + 1 * dir.x() + 16 * dir.y();
+                while !moved.black.board.get(clear_i as usize) {
+                    moved.white.board.clear(clear_i as usize);
+                    clear_i += 1 * dir.x() + 16 * dir.y();
+                }
+                moved.black.board.clear(clear_i as usize);
+
                 if let Some(GameAnalysisState::Complete(c)) = self.states.get(&moved) {
                     black_moves.insert(*c);
                 } else {
@@ -112,7 +118,10 @@ impl GameAnalyzer {
             (None, None) => 0,
             (None, Some(r)) => r - 1,
             (Some(l), None) => l + 1,
-            (Some(0), Some(0)) => panic!("can't handle nimbers yet!"),
+            (Some(0), Some(0)) => {
+                println!("can't handle nimbers yet! using zero...");
+                0
+            }
             (Some(l), Some(r)) => l + r,
         };
         self.states
@@ -148,6 +157,5 @@ pub fn main() {
 
     while analyzer.analyze_next() {}
 
-    println!("{:?}", analyzer);
     println!("{:?}", analyzer.states.get_index(0));
 }
