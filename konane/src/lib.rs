@@ -1,8 +1,16 @@
+pub mod bitboard;
+
 use bitarray::BitArray;
+use bitboard::{BitBoard256, Direction};
 
 pub struct Konane18x18 {
     pub white: BitArray<6, u64>,
     pub black: BitArray<6, u64>,
+}
+
+pub struct Konane256<const W: usize = 16, const H: usize = 16> {
+    pub white: BitBoard256<W, H>,
+    pub black: BitBoard256<W, H>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -12,20 +20,17 @@ pub enum TileState {
     Empty,
 }
 
-impl Konane18x18 {
+impl<const W: usize, const H: usize> Konane256<W, H> {
     pub fn empty() -> Self {
-        let mut base = BitArray::new();
-        base.set_range(18 * 18..base.bits());
-
         Self {
-            white: base.clone(),
-            black: base,
+            white: BitBoard256::new(),
+            black: BitBoard256::new(),
         }
     }
 
     pub fn small((rows, cols): (usize, usize), tiles: &[TileState]) -> Self {
-        let row_start = (18 - rows) / 2;
-        let col_start = (18 - cols) / 2;
+        let row_start = (H - rows) / 2;
+        let col_start = (W - cols) / 2;
         Self::small_at((row_start, col_start), (rows, cols), tiles)
     }
 
@@ -34,14 +39,14 @@ impl Konane18x18 {
         (rows, columns): (usize, usize),
         tiles: &[TileState],
     ) -> Self {
-        assert!(x_start < 18);
-        assert!(y_start < 18);
+        assert!(x_start < W);
+        assert!(y_start < H);
 
         let row_end = x_start + columns;
         let col_end = y_start + rows;
 
-        assert!(col_end <= 18);
-        assert!(row_end <= 18);
+        assert!(col_end <= W);
+        assert!(row_end <= H);
 
         let mut board = Self::empty();
         for i in 0..columns {
@@ -56,8 +61,8 @@ impl Konane18x18 {
     pub fn checkerboard() -> Self {
         let mut board = Self::empty();
 
-        for x in 0..18 {
-            for y in 0..18 {
+        for x in 0..W {
+            for y in 0..H {
                 board.set_tile(
                     x,
                     y,
@@ -73,38 +78,28 @@ impl Konane18x18 {
         board
     }
 
-    fn bit_index_of(x: usize, y: usize) -> usize {
-        // account for row end sigils
-        x + 18 * y
-    }
-
     pub fn set_tile(&mut self, x: usize, y: usize, state: TileState) {
         assert!(x < 18);
         assert!(y < 18);
 
-        let i = Self::bit_index_of(x, y);
         match state {
             TileState::White => {
-                self.white.set(i);
-                self.black.clear(i);
+                self.white.set(x, y, true);
+                self.black.set(x, y, false);
             }
             TileState::Black => {
-                self.black.set(i);
-                self.white.clear(i);
+                self.black.set(x, y, true);
+                self.white.set(x, y, false);
             }
             TileState::Empty => {
-                self.white.clear(i);
-                self.black.clear(i);
+                self.black.set(x, y, false);
+                self.white.set(x, y, false);
             }
         }
     }
 
     pub fn get_tile(&mut self, x: usize, y: usize) -> TileState {
-        assert!(x < 18);
-        assert!(y < 18);
-
-        let i = Self::bit_index_of(x, y);
-        match (self.black.get(i), self.white.get(i)) {
+        match (self.black.get(x, y), self.white.get(x, y)) {
             (true, true) => panic!("Tile at <{}, {}> is marked for both black and white", x, y),
             (false, false) => TileState::Empty,
             (true, false) => TileState::Black,
@@ -112,16 +107,24 @@ impl Konane18x18 {
         }
     }
 
-    pub fn empty_spaces(&self) -> BitArray<6, u64> {
+    pub fn empty_spaces(&self) -> BitArray<4, u64> {
         // get empty by selecting non-black spaces that don't have a white piece.
-        !self.black.clone() & !self.white.clone()
+        !self.black.board.clone() & !self.white.board.clone()
     }
 
-    pub fn white_moves_right(&self) -> MoveIter<'_, true> {
+    pub fn white_moves_right(&self) -> MoveIter<'_, true, true, W, H> {
         MoveIter::new_white(self)
     }
 
-    pub fn black_moves_right(&self) -> MoveIter<'_, false> {
+    pub fn black_moves_right(&self) -> MoveIter<'_, false, true, W, H> {
+        MoveIter::new_black(self)
+    }
+
+    pub fn white_moves_left(&self) -> MoveIter<'_, true, false, W, H> {
+        MoveIter::new_white(self)
+    }
+
+    pub fn black_moves_left(&self) -> MoveIter<'_, false, false, W, H> {
         MoveIter::new_black(self)
     }
 
@@ -136,52 +139,62 @@ impl Konane18x18 {
     }
 }
 
-pub struct MoveIter<'a, const IS_WHITE: bool> {
-    board: &'a Konane18x18,
-    moveset: BitArray<6, u64>,
+pub struct MoveIter<'a, const IS_WHITE: bool, const RIGHT: bool, const W: usize, const H: usize> {
+    board: &'a Konane256<W, H>,
+    moveset: BitBoard256<W, H>,
 }
 
-impl<'a> MoveIter<'a, true> {
-    pub fn new_white(board: &'a Konane18x18) -> Self {
-        let initial = !Konane18x18::right_border_mask() & &board.white;
-        MoveIter {
-            board,
-            moveset: initial,
-        }
+impl<'a, const RIGHT: bool, const W: usize, const H: usize> MoveIter<'a, true, RIGHT, W, H> {
+    pub fn new_white(board: &'a Konane256<W, H>) -> Self {
+        let mut moveset = BitBoard256::border_mask(Direction::Right);
+        moveset.board = !moveset.board;
+        moveset.board &= &board.white.board;
+        MoveIter { board, moveset }
     }
 }
 
-impl<'a> MoveIter<'a, false> {
-    pub fn new_black(board: &'a Konane18x18) -> Self {
-        let initial = !Konane18x18::right_border_mask() & &board.black;
-        MoveIter {
-            board,
-            moveset: initial,
-        }
+impl<'a, const RIGHT: bool, const W: usize, const H: usize> MoveIter<'a, false, RIGHT, W, H> {
+    pub fn new_black(board: &'a Konane256<W, H>) -> Self {
+        let mut moveset = BitBoard256::border_mask(Direction::Right);
+        dbg!(&moveset);
+        moveset.board = !moveset.board;
+        moveset.board &= &board.black.board;
+        MoveIter { board, moveset }
     }
 }
 
-impl<'a, const IS_WHITE: bool> Iterator for MoveIter<'a, IS_WHITE> {
-    type Item = BitArray<6, u64>;
+impl<'a, const IS_WHITE: bool, const RIGHT: bool, const W: usize, const H: usize> Iterator
+    for MoveIter<'a, IS_WHITE, RIGHT, W, H>
+{
+    type Item = BitBoard256<W, H>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.moveset.is_empty() {
+        if self.moveset.board.is_empty() {
             None
         } else {
-            self.moveset <<= 1;
+            if RIGHT {
+                self.moveset.board <<= 1;
+            } else {
+                self.moveset.board >>= 1;
+            }
 
             // 1. verify that there's a capture-able piece to the right 1 space
             if IS_WHITE {
-                self.moveset &= &self.board.black;
+                self.moveset.board &= &self.board.black.board;
             } else {
-                self.moveset &= &self.board.white;
+                self.moveset.board &= &self.board.white.board;
             }
 
             // 2. verify there's an empty tile to the right 2 spaces
-            self.moveset <<= 1;
-            self.moveset &= self.board.empty_spaces();
+            if RIGHT {
+                self.moveset.board <<= 1;
+            } else {
+                self.moveset.board >>= 1;
+            }
 
-            if !self.moveset.is_empty() {
+            self.moveset.board &= self.board.empty_spaces();
+
+            if !self.moveset.board.is_empty() {
                 Some(self.moveset.clone())
             } else {
                 None
@@ -192,21 +205,19 @@ impl<'a, const IS_WHITE: bool> Iterator for MoveIter<'a, IS_WHITE> {
 
 #[cfg(test)]
 mod test {
-    use bitarray::BitArray;
-
-    use crate::Konane18x18;
+    use crate::{bitboard::BitBoard256, Konane256};
 
     #[test]
-    pub fn checkerboard() {
-        let board = Konane18x18::checkerboard();
-        for i in 0..(18 * 18 - 1) {
-            assert_eq!(board.black.get(i), board.white.get(i + 1));
+    pub fn checkerboard_16x16() {
+        let board: Konane256<16, 16> = Konane256::checkerboard();
+        for i in 0..(16 * 16 - 1) {
+            assert_eq!(board.black.board.get(i), board.white.board.get(i + 1));
         }
     }
 
     #[test]
-    pub fn moveset_on_full_board_is_empty() {
-        let board = Konane18x18::checkerboard();
+    pub fn moveset_on_full_board_is_empty_16x16() {
+        let board: Konane256<16, 16> = Konane256::checkerboard();
         dbg!(board.empty_spaces());
         dbg!(&board.white);
         dbg!(&board.black);
@@ -221,12 +232,12 @@ mod test {
     pub fn moveset_white_right_jump() {
         use crate::TileState::{Black, White};
 
-        let board = Konane18x18::small_at((0, 0), (1, 2), &[White, Black]);
+        let board: Konane256 = Konane256::small_at((0, 0), (1, 2), &[White, Black]);
         let white = board.white_moves_right().collect::<Vec<_>>();
         let black = board.black_moves_right().collect::<Vec<_>>();
 
-        let mut white_expected = BitArray::new();
-        white_expected.set(Konane18x18::bit_index_of(2, 0));
+        let mut white_expected = BitBoard256::new();
+        white_expected.set(2, 0, true);
         assert_eq!(white, vec![white_expected]);
         assert_eq!(black, vec![]);
     }
@@ -235,12 +246,40 @@ mod test {
     pub fn moveset_black_right_jump() {
         use crate::TileState::{Black, White};
 
-        let board = Konane18x18::small_at((0, 0), (1, 2), &[Black, White]);
+        let board: Konane256 = Konane256::small_at((0, 0), (1, 2), &[Black, White]);
         let white = board.white_moves_right().collect::<Vec<_>>();
         let black = board.black_moves_right().collect::<Vec<_>>();
 
-        let mut black_expected = BitArray::new();
-        black_expected.set(Konane18x18::bit_index_of(2, 0));
+        let mut black_expected = BitBoard256::new();
+        black_expected.set(2, 0, true);
+        assert_eq!(black, vec![black_expected]);
+        assert_eq!(white, vec![]);
+    }
+
+    #[test]
+    pub fn moveset_white_left_jump() {
+        use crate::TileState::{Black, White};
+
+        let board: Konane256 = Konane256::small_at((1, 0), (1, 2), &[Black, White]);
+        let white = board.white_moves_left().collect::<Vec<_>>();
+        let black = board.black_moves_left().collect::<Vec<_>>();
+
+        let mut white_expected = BitBoard256::new();
+        white_expected.set(0, 0, true);
+        assert_eq!(white, vec![white_expected]);
+        assert_eq!(black, vec![]);
+    }
+
+    #[test]
+    pub fn moveset_black_left_jump() {
+        use crate::TileState::{Black, White};
+
+        let board: Konane256 = Konane256::small_at((1, 0), (1, 2), &[White, Black]);
+        let white = board.white_moves_left().collect::<Vec<_>>();
+        let black = board.black_moves_left().collect::<Vec<_>>();
+
+        let mut black_expected = BitBoard256::new();
+        black_expected.set(0, 0, true);
         assert_eq!(black, vec![black_expected]);
         assert_eq!(white, vec![]);
     }
