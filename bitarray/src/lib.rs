@@ -469,7 +469,7 @@ impl<const N: usize, B: BitArrayBlock> ops::Not for BitArray<N, B> {
 mod test {
     use proptest::{
         prelude::{any, Just, Strategy},
-        prop_assert, prop_assert_eq, prop_assume, prop_compose, proptest, sample,
+        prop_assert, prop_assert_eq, proptest,
     };
 
     use crate::BitArray;
