@@ -53,6 +53,40 @@ pub trait BitArrayBlock:
 
     // get the index of the last non-zero bit in the block
     fn last_set(&self) -> Option<usize>;
+
+    // get the index of the first zero bit in the block
+    fn first_clear(&self) -> Option<usize>;
+
+    // get the index of the last zero bit in the block
+    fn last_clear(&self) -> Option<usize>;
+
+    fn count_set(&self) -> usize;
+
+    fn count_clear(&self) -> usize;
+
+    fn first(&self, is_set: bool) -> Option<usize> {
+        if is_set {
+            self.first_set()
+        } else {
+            self.first_clear()
+        }
+    }
+
+    fn last(&self, is_set: bool) -> Option<usize> {
+        if is_set {
+            self.last_set()
+        } else {
+            self.last_clear()
+        }
+    }
+
+    fn count(&self, is_set: bool) -> usize {
+        if is_set {
+            self.count_set()
+        } else {
+            self.count_clear()
+        }
+    }
 }
 
 macro_rules! impl_bit_array_block {
@@ -83,8 +117,34 @@ macro_rules! impl_bit_array_block {
             fn last_set(&self) -> Option<usize> {
                 match (*self).leading_zeros() as usize {
                     Self::BLOCK_LENGTH => None,
+                    i => Some(i - 1),
+                }
+            }
+
+            #[inline(always)]
+            fn first_clear(&self) -> Option<usize> {
+                match (*self).trailing_ones() as usize {
+                    Self::BLOCK_LENGTH => None,
                     i => Some(i),
                 }
+            }
+
+            #[inline(always)]
+            fn last_clear(&self) -> Option<usize> {
+                match (*self).leading_ones() as usize {
+                    Self::BLOCK_LENGTH => None,
+                    i => Some(i),
+                }
+            }
+
+            #[inline(always)]
+            fn count_set(&self) -> usize {
+                self.count_ones() as usize
+            }
+
+            #[inline(always)]
+            fn count_clear(&self) -> usize {
+                self.count_zeros() as usize
             }
         }
     };

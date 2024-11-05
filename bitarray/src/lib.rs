@@ -1,10 +1,12 @@
 #[cfg(any(test, feature = "proptest"))]
 mod arbitrary;
 mod block;
+pub mod iter;
 
 use std::ops;
 
 use block::BitArrayBlock;
+use iter::BitArrayIter;
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct BitArray<const BLOCK_COUNT: usize, Block: BitArrayBlock = u64> {
@@ -33,6 +35,14 @@ impl<const BLOCK_COUNT: usize, Block: BitArrayBlock> BitArray<BLOCK_COUNT, Block
         Self {
             blocks: [Block::empty(); BLOCK_COUNT],
         }
+    }
+
+    pub fn iter_set(&self) -> BitArrayIter<'_, true, false, BLOCK_COUNT, Block> {
+        BitArrayIter::new(self)
+    }
+
+    pub fn iter_clear(&self) -> BitArrayIter<'_, false, false, BLOCK_COUNT, Block> {
+        BitArrayIter::new(self)
     }
 
     pub fn set(&mut self, bit: usize) {
@@ -86,7 +96,28 @@ impl<const BLOCK_COUNT: usize, Block: BitArrayBlock> BitArray<BLOCK_COUNT, Block
 
     pub fn last_set(&self) -> Option<usize> {
         for (block_i_inv, block) in self.blocks.iter().enumerate() {
-            if let Some(bit_i) = block.first_set() {
+            if let Some(bit_i) = block.last_set() {
+                let block_i = self.blocks.len() - block_i_inv - 1;
+                return Some(block_i * Self::block_len() + bit_i);
+            }
+        }
+
+        None
+    }
+
+    pub fn first_clear(&self) -> Option<usize> {
+        for (block_i, block) in self.blocks.iter().rev().enumerate() {
+            if let Some(bit_i) = block.first_clear() {
+                return Some(block_i * Self::block_len() + bit_i);
+            }
+        }
+
+        None
+    }
+
+    pub fn last_clear(&self) -> Option<usize> {
+        for (block_i_inv, block) in self.blocks.iter().enumerate() {
+            if let Some(bit_i) = block.last_clear() {
                 let block_i = self.blocks.len() - block_i_inv - 1;
                 return Some(block_i * Self::block_len() + bit_i);
             }
@@ -485,6 +516,32 @@ mod test {
             prop_assert_eq!(lhs.clone() & rhs.clone(), rhs.clone() & lhs.clone());
             prop_assert_eq!(lhs.clone() | rhs.clone(), rhs.clone() | lhs.clone());
             prop_assert_eq!(lhs.clone() ^ rhs.clone(), rhs.clone() ^ lhs.clone());
+        }
+
+        #[test]
+        fn iter_set_u64x4(bits in any::<BitArray<4, u64>>()) {
+            let mut last_index = 0;
+            let mut iter = bits.iter_set();
+            while let Some(bit_i) = iter.next(){
+                assert!(bits.get(bit_i), "Bit index from iter not set.\ni = {bit_i}\niter = {:?}", &iter);
+                for unset_i in last_index+1..bit_i {
+                    assert!(!bits.get(unset_i), "Bit not returned by iter set.\ni = {unset_i}\niter = {:?}", &iter);
+                }
+                last_index = bit_i;
+            }
+        }
+
+        #[test]
+        fn iter_clear_u64x4(bits in any::<BitArray<4, u64>>()) {
+            let mut last_index = 0;
+            let mut iter = bits.iter_clear();
+            while let Some(bit_i) = iter.next() {
+                assert!(!bits.get(bit_i), "Bit index from iter set.\ni = {bit_i}\niter = {:?}", &iter);
+                for unset_i in last_index+1..bit_i {
+                    assert!(bits.get(unset_i), "Bit not returned by iter not set.\ni = {unset_i}\niter = {:?}", &iter);
+                }
+                last_index = bit_i;
+            }
         }
     }
 }
