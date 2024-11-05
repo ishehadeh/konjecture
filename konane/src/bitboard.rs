@@ -8,7 +8,31 @@ pub enum Direction {
     Right,
 }
 
-#[derive(Clone, PartialEq, Eq)]
+impl Direction {
+    pub fn all() -> [Self; 4] {
+        [Self::Up, Self::Down, Self::Left, Self::Right]
+    }
+
+    pub fn x(&self) -> isize {
+        match self {
+            Direction::Up => 0,
+            Direction::Down => 0,
+            Direction::Left => 1,
+            Direction::Right => -1,
+        }
+    }
+
+    pub fn y(&self) -> isize {
+        match self {
+            Direction::Up => 1,
+            Direction::Down => -1,
+            Direction::Left => 0,
+            Direction::Right => 0,
+        }
+    }
+}
+
+#[derive(Clone, PartialEq, Eq, Hash)]
 pub struct BitBoard256<const W: usize, const H: usize> {
     pub board: BitArray<4, u64>,
 }

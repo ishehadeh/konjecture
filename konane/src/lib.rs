@@ -3,11 +3,7 @@ pub mod bitboard;
 use bitarray::BitArray;
 use bitboard::{BitBoard256, Direction};
 
-pub struct Konane18x18 {
-    pub white: BitArray<6, u64>,
-    pub black: BitArray<6, u64>,
-}
-
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Konane256<const W: usize = 16, const H: usize = 16> {
     pub white: BitBoard256<W, H>,
     pub black: BitBoard256<W, H>,

@@ -8,7 +8,7 @@ use std::ops::{self, BitXorAssign};
 use block::BitArrayBlock;
 use iter::BitArrayIter;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd)]
 pub struct BitArray<const BLOCK_COUNT: usize, Block: BitArrayBlock = u64> {
     // blocks are stored in reverse order
     blocks: [Block; BLOCK_COUNT],
@@ -35,6 +35,10 @@ impl<const BLOCK_COUNT: usize, Block: BitArrayBlock> BitArray<BLOCK_COUNT, Block
         Self {
             blocks: [Block::empty(); BLOCK_COUNT],
         }
+    }
+
+    pub fn blocks(&self) -> &[Block; BLOCK_COUNT] {
+        &self.blocks
     }
 
     pub fn iter_set(&self) -> BitArrayIter<'_, true, false, BLOCK_COUNT, Block> {

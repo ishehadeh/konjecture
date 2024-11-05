@@ -5,3 +5,9 @@ edition = "2021"
 
 [dependencies]
 bitarray = { path = "../bitarray" }
+indexmap = { version = "=2.6.0" }
+
+[features]
+
+[[bin]]
+name = "konane-score"
