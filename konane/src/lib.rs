@@ -112,19 +112,35 @@ impl<const W: usize, const H: usize> Konane256<W, H> {
         !self.black.board.clone() & !self.white.board.clone()
     }
 
-    pub fn white_moves_right(&self) -> MoveIter<'_, true, true, W, H> {
+    pub fn white_moves_right(&self) -> MoveIter<'_, true, 0, W, H> {
         MoveIter::new_white(self)
     }
 
-    pub fn black_moves_right(&self) -> MoveIter<'_, false, true, W, H> {
+    pub fn black_moves_right(&self) -> MoveIter<'_, false, 0, W, H> {
         MoveIter::new_black(self)
     }
 
-    pub fn white_moves_left(&self) -> MoveIter<'_, true, false, W, H> {
+    pub fn white_moves_left(&self) -> MoveIter<'_, true, 1, W, H> {
         MoveIter::new_white(self)
     }
 
-    pub fn black_moves_left(&self) -> MoveIter<'_, false, false, W, H> {
+    pub fn black_moves_left(&self) -> MoveIter<'_, false, 1, W, H> {
+        MoveIter::new_black(self)
+    }
+
+    pub fn white_moves_up(&self) -> MoveIter<'_, true, 2, W, H> {
+        MoveIter::new_white(self)
+    }
+
+    pub fn black_moves_up(&self) -> MoveIter<'_, false, 2, W, H> {
+        MoveIter::new_black(self)
+    }
+
+    pub fn white_moves_down(&self) -> MoveIter<'_, true, 3, W, H> {
+        MoveIter::new_white(self)
+    }
+
+    pub fn black_moves_down(&self) -> MoveIter<'_, false, 3, W, H> {
         MoveIter::new_black(self)
     }
 
@@ -139,32 +155,62 @@ impl<const W: usize, const H: usize> Konane256<W, H> {
     }
 }
 
-pub struct MoveIter<'a, const IS_WHITE: bool, const RIGHT: bool, const W: usize, const H: usize> {
+pub struct MoveIter<'a, const IS_WHITE: bool, const DIR: usize, const W: usize, const H: usize> {
     board: &'a Konane256<W, H>,
     moveset: BitBoard256<W, H>,
 }
+impl<'a, const IS_WHITE: bool, const DIR: usize, const W: usize, const H: usize>
+    MoveIter<'a, IS_WHITE, DIR, W, H>
+{
+    fn step(&mut self) {
+        match DIR {
+            // right
+            0 => self.moveset.board <<= 1,
+            // left
+            1 => self.moveset.board >>= 1,
+            // up
+            2 => self.moveset.board >>= W,
+            // down
+            3 => self.moveset.board <<= W,
+            _ => panic!("invalid direction"),
+        }
+    }
 
-impl<'a, const RIGHT: bool, const W: usize, const H: usize> MoveIter<'a, true, RIGHT, W, H> {
+    pub fn direction() -> Direction {
+        match DIR {
+            // right
+            0 => Direction::Right,
+            // left
+            1 => Direction::Left,
+            // up
+            2 => Direction::Up,
+            // down
+            3 => Direction::Down,
+            _ => panic!("invalid direction"),
+        }
+    }
+}
+
+impl<'a, const DIR: usize, const W: usize, const H: usize> MoveIter<'a, true, DIR, W, H> {
     pub fn new_white(board: &'a Konane256<W, H>) -> Self {
-        let mut moveset = BitBoard256::border_mask(Direction::Right);
+        let mut moveset = BitBoard256::border_mask(Self::direction());
         moveset.board = !moveset.board;
         moveset.board &= &board.white.board;
         MoveIter { board, moveset }
     }
 }
 
-impl<'a, const RIGHT: bool, const W: usize, const H: usize> MoveIter<'a, false, RIGHT, W, H> {
+impl<'a, const DIR: usize, const W: usize, const H: usize> MoveIter<'a, false, DIR, W, H> {
     pub fn new_black(board: &'a Konane256<W, H>) -> Self {
-        let mut moveset = BitBoard256::border_mask(Direction::Right);
-        dbg!(&moveset);
+        let mut moveset = BitBoard256::border_mask(Self::direction());
         moveset.board = !moveset.board;
         moveset.board &= &board.black.board;
         MoveIter { board, moveset }
     }
 }
 
-impl<'a, const IS_WHITE: bool, const RIGHT: bool, const W: usize, const H: usize> Iterator
-    for MoveIter<'a, IS_WHITE, RIGHT, W, H>
+impl<'a, const IS_WHITE: bool, const DIR: usize, const W: usize, const H: usize> Iterator
+    for MoveIter<'a, IS_WHITE, DIR, W, H>
 {
     type Item = BitBoard256<W, H>;
 
@@ -172,13 +218,8 @@ impl<'a, const IS_WHITE: bool, const RIGHT: bool, const W: usize, const H: usize
         if self.moveset.board.is_empty() {
             None
         } else {
-            if RIGHT {
-                self.moveset.board <<= 1;
-            } else {
-                self.moveset.board >>= 1;
-            }
-
-            // 1. verify that there's a capture-able piece to the right 1 space
+            // 1. verify that there's a capture-able adjacent piece
+            self.step();
             if IS_WHITE {
                 self.moveset.board &= &self.board.black.board;
             } else {
@@ -186,11 +227,7 @@ impl<'a, const IS_WHITE: bool, const RIGHT: bool, const W: usize, const H: usize
             }
 
             // 2. verify there's an empty tile to the right 2 spaces
-            if RIGHT {
-                self.moveset.board <<= 1;
-            } else {
-                self.moveset.board >>= 1;
-            }
+            self.step();
 
             self.moveset.board &= self.board.empty_spaces();
 
@@ -221,11 +258,23 @@ mod test {
         dbg!(board.empty_spaces());
         dbg!(&board.white);
         dbg!(&board.black);
-        let white = board.white_moves_right().collect::<Vec<_>>();
-        let black = board.black_moves_right().collect::<Vec<_>>();
+        let w_r = board.white_moves_right().collect::<Vec<_>>();
+        let b_r = board.black_moves_right().collect::<Vec<_>>();
+        let w_l = board.white_moves_left().collect::<Vec<_>>();
+        let b_l = board.black_moves_left().collect::<Vec<_>>();
+        let w_u = board.white_moves_up().collect::<Vec<_>>();
+        let b_u = board.black_moves_up().collect::<Vec<_>>();
+        let w_d = board.white_moves_down().collect::<Vec<_>>();
+        let b_d = board.black_moves_down().collect::<Vec<_>>();
 
-        assert_eq!(white, vec![]);
-        assert_eq!(black, vec![]);
+        assert_eq!(w_r, vec![]);
+        assert_eq!(b_r, vec![]);
+        assert_eq!(w_l, vec![]);
+        assert_eq!(b_l, vec![]);
+        assert_eq!(w_u, vec![]);
+        assert_eq!(b_u, vec![]);
+        assert_eq!(w_d, vec![]);
+        assert_eq!(b_d, vec![]);
     }
 
     #[test]
@@ -233,13 +282,25 @@ mod test {
         use crate::TileState::{Black, White};
 
         let board: Konane256 = Konane256::small_at((0, 0), (1, 2), &[White, Black]);
-        let white = board.white_moves_right().collect::<Vec<_>>();
-        let black = board.black_moves_right().collect::<Vec<_>>();
+        let mut expected_w_r = BitBoard256::new();
+        expected_w_r.set(2, 0, true);
+        let w_r = board.white_moves_right().collect::<Vec<_>>();
+        let b_r = board.black_moves_right().collect::<Vec<_>>();
+        let w_l = board.white_moves_left().collect::<Vec<_>>();
+        let b_l = board.black_moves_left().collect::<Vec<_>>();
+        let w_u = board.white_moves_up().collect::<Vec<_>>();
+        let b_u = board.black_moves_up().collect::<Vec<_>>();
+        let w_d = board.white_moves_down().collect::<Vec<_>>();
+        let b_d = board.black_moves_down().collect::<Vec<_>>();
 
-        let mut white_expected = BitBoard256::new();
-        white_expected.set(2, 0, true);
-        assert_eq!(white, vec![white_expected]);
-        assert_eq!(black, vec![]);
+        assert_eq!(w_r, vec![expected_w_r]);
+        assert_eq!(b_r, vec![]);
+        assert_eq!(w_l, vec![]);
+        assert_eq!(b_l, vec![]);
+        assert_eq!(w_u, vec![]);
+        assert_eq!(b_u, vec![]);
+        assert_eq!(w_d, vec![]);
+        assert_eq!(b_d, vec![]);
     }
 
     #[test]
@@ -247,40 +308,180 @@ mod test {
         use crate::TileState::{Black, White};
 
         let board: Konane256 = Konane256::small_at((0, 0), (1, 2), &[Black, White]);
-        let white = board.white_moves_right().collect::<Vec<_>>();
-        let black = board.black_moves_right().collect::<Vec<_>>();
+        let mut expected_b_r = BitBoard256::new();
+        expected_b_r.set(2, 0, true);
+        let w_r = board.white_moves_right().collect::<Vec<_>>();
+        let b_r = board.black_moves_right().collect::<Vec<_>>();
+        let w_l = board.white_moves_left().collect::<Vec<_>>();
+        let b_l = board.black_moves_left().collect::<Vec<_>>();
+        let w_u = board.white_moves_up().collect::<Vec<_>>();
+        let b_u = board.black_moves_up().collect::<Vec<_>>();
+        let w_d = board.white_moves_down().collect::<Vec<_>>();
+        let b_d = board.black_moves_down().collect::<Vec<_>>();
 
-        let mut black_expected = BitBoard256::new();
-        black_expected.set(2, 0, true);
-        assert_eq!(black, vec![black_expected]);
-        assert_eq!(white, vec![]);
+        assert_eq!(w_r, vec![]);
+        assert_eq!(b_r, vec![expected_b_r]);
+        assert_eq!(w_l, vec![]);
+        assert_eq!(b_l, vec![]);
+        assert_eq!(w_u, vec![]);
+        assert_eq!(b_u, vec![]);
+        assert_eq!(w_d, vec![]);
+        assert_eq!(b_d, vec![]);
     }
 
     #[test]
     pub fn moveset_white_left_jump() {
         use crate::TileState::{Black, White};
 
-        let board: Konane256 = Konane256::small_at((1, 0), (1, 2), &[Black, White]);
-        let white = board.white_moves_left().collect::<Vec<_>>();
-        let black = board.black_moves_left().collect::<Vec<_>>();
+        let board: Konane256 = Konane256::small_at((1, 0), (1, 3), &[Black, White, White]);
+        let mut expected_w_l = BitBoard256::new();
+        expected_w_l.set(0, 0, true);
+        let w_r = board.white_moves_right().collect::<Vec<_>>();
+        let b_r = board.black_moves_right().collect::<Vec<_>>();
+        let w_l = board.white_moves_left().collect::<Vec<_>>();
+        let b_l = board.black_moves_left().collect::<Vec<_>>();
+        let w_u = board.white_moves_up().collect::<Vec<_>>();
+        let b_u = board.black_moves_up().collect::<Vec<_>>();
+        let w_d = board.white_moves_down().collect::<Vec<_>>();
+        let b_d = board.black_moves_down().collect::<Vec<_>>();
 
-        let mut white_expected = BitBoard256::new();
-        white_expected.set(0, 0, true);
-        assert_eq!(white, vec![white_expected]);
-        assert_eq!(black, vec![]);
+        assert_eq!(w_r, vec![]);
+        assert_eq!(b_r, vec![]);
+        assert_eq!(w_l, vec![expected_w_l]);
+        assert_eq!(b_l, vec![]);
+        assert_eq!(w_u, vec![]);
+        assert_eq!(b_u, vec![]);
+        assert_eq!(w_d, vec![]);
+        assert_eq!(b_d, vec![]);
     }
 
     #[test]
     pub fn moveset_black_left_jump() {
         use crate::TileState::{Black, White};
 
-        let board: Konane256 = Konane256::small_at((1, 0), (1, 2), &[White, Black]);
-        let white = board.white_moves_left().collect::<Vec<_>>();
-        let black = board.black_moves_left().collect::<Vec<_>>();
+        let board: Konane256 = Konane256::small_at((1, 0), (1, 3), &[White, Black, Black]);
+        let mut expected_b_l = BitBoard256::new();
+        expected_b_l.set(0, 0, true);
+        let w_r = board.white_moves_right().collect::<Vec<_>>();
+        let b_r = board.black_moves_right().collect::<Vec<_>>();
+        let w_l = board.white_moves_left().collect::<Vec<_>>();
+        let b_l = board.black_moves_left().collect::<Vec<_>>();
+        let w_u = board.white_moves_up().collect::<Vec<_>>();
+        let b_u = board.black_moves_up().collect::<Vec<_>>();
+        let w_d = board.white_moves_down().collect::<Vec<_>>();
+        let b_d = board.black_moves_down().collect::<Vec<_>>();
 
-        let mut black_expected = BitBoard256::new();
-        black_expected.set(0, 0, true);
-        assert_eq!(black, vec![black_expected]);
-        assert_eq!(white, vec![]);
+        assert_eq!(w_r, vec![]);
+        assert_eq!(b_r, vec![]);
+        assert_eq!(w_l, vec![]);
+        assert_eq!(b_l, vec![expected_b_l]);
+        assert_eq!(w_u, vec![]);
+        assert_eq!(b_u, vec![]);
+        assert_eq!(w_d, vec![]);
+        assert_eq!(b_d, vec![]);
+    }
+
+    #[test]
+    pub fn moveset_white_up_jump() {
+        use crate::TileState::{Black, White};
+
+        let board: Konane256 = Konane256::small_at((0, 1), (3, 1), &[Black, White, White]);
+        let mut expected_w_u = BitBoard256::new();
+        expected_w_u.set(0, 0, true);
+        let w_r = board.white_moves_right().collect::<Vec<_>>();
+        let b_r = board.black_moves_right().collect::<Vec<_>>();
+        let w_l = board.white_moves_left().collect::<Vec<_>>();
+        let b_l = board.black_moves_left().collect::<Vec<_>>();
+        let w_u = board.white_moves_up().collect::<Vec<_>>();
+        let b_u = board.black_moves_up().collect::<Vec<_>>();
+        let w_d = board.white_moves_down().collect::<Vec<_>>();
+        let b_d = board.black_moves_down().collect::<Vec<_>>();
+
+        assert_eq!(w_r, vec![]);
+        assert_eq!(b_r, vec![]);
+        assert_eq!(w_l, vec![]);
+        assert_eq!(b_l, vec![]);
+        assert_eq!(w_u, vec![expected_w_u]);
+        assert_eq!(b_u, vec![]);
+        assert_eq!(w_d, vec![]);
+        assert_eq!(b_d, vec![]);
+    }
+
+    #[test]
+    pub fn moveset_black_up_jump() {
+        use crate::TileState::{Black, White};
+
+        let board: Konane256 = Konane256::small_at((0, 1), (3, 1), &[White, Black, Black]);
+        let mut expected_b_u = BitBoard256::new();
+        expected_b_u.set(0, 0, true);
+        let w_r = board.white_moves_right().collect::<Vec<_>>();
+        let b_r = board.black_moves_right().collect::<Vec<_>>();
+        let w_l = board.white_moves_left().collect::<Vec<_>>();
+        let b_l = board.black_moves_left().collect::<Vec<_>>();
+        let w_u = board.white_moves_up().collect::<Vec<_>>();
+        let b_u = board.black_moves_up().collect::<Vec<_>>();
+        let w_d = board.white_moves_down().collect::<Vec<_>>();
+        let b_d = board.black_moves_down().collect::<Vec<_>>();
+
+        assert_eq!(w_r, vec![]);
+        assert_eq!(b_r, vec![]);
+        assert_eq!(w_l, vec![]);
+        assert_eq!(b_l, vec![]);
+        assert_eq!(w_u, vec![]);
+        assert_eq!(b_u, vec![expected_b_u]);
+        assert_eq!(w_d, vec![]);
+        assert_eq!(b_d, vec![]);
+    }
+
+    #[test]
+    pub fn moveset_white_down_jump() {
+        use crate::TileState::{Black, White};
+
+        let board: Konane256 = Konane256::small_at((0, 0), (2, 1), &[White, Black]);
+        let mut expected_w_d = BitBoard256::new();
+        expected_w_d.set(0, 2, true);
+        let w_r = board.white_moves_right().collect::<Vec<_>>();
+        let b_r = board.black_moves_right().collect::<Vec<_>>();
+        let w_l = board.white_moves_left().collect::<Vec<_>>();
+        let b_l = board.black_moves_left().collect::<Vec<_>>();
+        let w_u = board.white_moves_up().collect::<Vec<_>>();
+        let b_u = board.black_moves_up().collect::<Vec<_>>();
+        let w_d = board.white_moves_down().collect::<Vec<_>>();
+        let b_d = board.black_moves_down().collect::<Vec<_>>();
+
+        assert_eq!(w_r, vec![]);
+        assert_eq!(b_r, vec![]);
+        assert_eq!(w_l, vec![]);
+        assert_eq!(b_l, vec![]);
+        assert_eq!(w_u, vec![]);
+        assert_eq!(b_u, vec![]);
+        assert_eq!(w_d, vec![expected_w_d]);
+        assert_eq!(b_d, vec![]);
+    }
+
+    #[test]
+    pub fn moveset_black_down_jump() {
+        use crate::TileState::{Black, White};
+
+        let board: Konane256 = Konane256::small_at((0, 0), (2, 1), &[Black, White]);
+        let mut expected_b_d = BitBoard256::new();
+        expected_b_d.set(0, 2, true);
+        let w_r = board.white_moves_right().collect::<Vec<_>>();
+        let b_r = board.black_moves_right().collect::<Vec<_>>();
+        let w_l = board.white_moves_left().collect::<Vec<_>>();
+        let b_l = board.black_moves_left().collect::<Vec<_>>();
+        let w_u = board.white_moves_up().collect::<Vec<_>>();
+        let b_u = board.black_moves_up().collect::<Vec<_>>();
+        let w_d = board.white_moves_down().collect::<Vec<_>>();
+        let b_d = board.black_moves_down().collect::<Vec<_>>();
+
+        assert_eq!(w_r, vec![]);
+        assert_eq!(b_r, vec![]);
+        assert_eq!(w_l, vec![]);
+        assert_eq!(b_l, vec![]);
+        assert_eq!(w_u, vec![]);
+        assert_eq!(b_u, vec![]);
+        assert_eq!(w_d, vec![]);
+        assert_eq!(b_d, vec![expected_b_d]);
     }
 }
