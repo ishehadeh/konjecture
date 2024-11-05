@@ -1,5 +1,6 @@
 use bitarray::BitArray;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Direction {
     Up,
     Down,
