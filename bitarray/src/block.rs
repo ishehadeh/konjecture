@@ -117,7 +117,7 @@ macro_rules! impl_bit_array_block {
             fn last_set(&self) -> Option<usize> {
                 match (*self).leading_zeros() as usize {
                     Self::BLOCK_LENGTH => None,
-                    i => Some(i - 1),
+                    i => Some(i),
                 }
             }
 

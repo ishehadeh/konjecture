@@ -44,7 +44,7 @@ impl<'a, const VALUE: bool, const REV: bool, const BLOCK_COUNT: usize, Block: Bi
         } else {
             !Block::empty() << self.bit_index as usize
         };
-        println!("{mask:064b}, {}", self.bit_index);
+        // println!("{mask:064b}, {}", self.bit_index);
 
         if VALUE {
             // set all checked bits to 0
