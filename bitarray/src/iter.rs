@@ -32,7 +32,7 @@ impl<'a, const VALUE: bool, const REV: bool, const BLOCK_COUNT: usize, Block: Bi
         let unchecked = self.get_unchecked_in_block();
 
         if !REV {
-            dbg!(dbg!(unchecked).first(VALUE))
+            unchecked.first(VALUE)
         } else {
             unchecked.last(VALUE)
         }
