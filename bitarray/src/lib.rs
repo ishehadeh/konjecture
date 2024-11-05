@@ -74,6 +74,16 @@ impl<const BLOCK_COUNT: usize, Block: BitArrayBlock> BitArray<BLOCK_COUNT, Block
         }
     }
 
+    pub fn set_range_step(&mut self, range: std::ops::Range<usize>, step: usize) {
+        assert!(step > 0);
+
+        let mut i = range.start;
+        while i < range.end {
+            self.set(i);
+            i += step;
+        }
+    }
+
     pub fn clear(&mut self, bit: usize) {
         let (block, bit) = Self::addr(bit);
         self.blocks[block].clear(bit)
@@ -497,6 +507,24 @@ mod test {
                 }
             }
         }
+
+        #[test]
+        fn set_range_step_u64x4(a in 0usize..(64 * 4), b in 0usize..(64 * 4), step in 1usize..(64 * 4)) {
+            let lo = a.min(b);
+            let hi = a.max(b);
+
+            let mut arr = BitArray::<4, u64>::new();
+            arr.set_range_step(lo..hi, step);
+
+            for i in 0usize..(64 * 4) {
+                if i >= lo && i < hi && (i - lo) % step == 0 {
+                    prop_assert!(arr.get(i), "element in range not set: i={i}, range={lo}..{hi}\n  arr = {arr:?}");
+                } else {
+                    prop_assert!(!arr.get(i), "element outside of range set: i={i}, range={lo}..{hi}\n  arr = {arr:?}");
+                }
+            }
+        }
+
 
 
         #[test]
