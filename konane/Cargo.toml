@@ -5,9 +5,12 @@ edition = "2021"
 
 [dependencies]
 bitarray = { path = "../bitarray" }
-indexmap = { version = "=2.6.0" }
+indexmap = { version = "=2.6.0", optional = true }
+cgt = { version = "0.5", optional = true, features = ["rayon"] }
 
 [features]
+cgt = ["dep:cgt"]
 
 [[bin]]
 name = "konane-score"
+required-features = ["cgt"]

@@ -49,7 +49,7 @@ impl<const W: usize, const H: usize> BitBoard256<W, H> {
         assert!(W > 0);
         assert!(H > 0);
         let mut board = BitArray::new();
-        board.set_range(W * H..board.bits());
+        // board.set_range(W * H..board.bits());
         Self { board }
     }
 
@@ -89,9 +89,9 @@ impl<const W: usize, const H: usize> std::fmt::Debug for BitBoard256<W, H> {
             write!(f, "   ")?;
             for x in 0..W {
                 if self.get(x, y) {
-                    write!(f, " 0")?;
-                } else {
                     write!(f, " 1")?;
+                } else {
+                    write!(f, " 0")?;
                 }
             }
             writeln!(f, "")?;

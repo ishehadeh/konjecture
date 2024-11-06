@@ -1,4 +1,6 @@
 pub mod bitboard;
+#[cfg(feature = "cgt")]
+pub mod cgt;
 
 use bitarray::BitArray;
 use bitboard::{BitBoard256, Direction};
