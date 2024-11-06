@@ -80,35 +80,6 @@ impl<const W: usize, const H: usize> BitBoard256<W, H> {
             self.board.clear(x + y * H)
         }
     }
-
-    /// rotate counter clockwise
-    pub fn transpose(mut self) -> BitBoard256<H, W> {
-        assert!(W == H);
-
-        let mut block_size = W / 2;
-        while block_size > 1 {
-            let mut block_mask = BitArray::<4, u64>::new();
-
-            block_mask.set_range(block_size..block_size * 2);
-            self.board.detla_swap(block_mask, block_size * H);
-            block_size /= 2;
-        }
-
-        let mut mask0: BitArray<4, u64> = BitArray::new();
-        for i in 0..H {
-            if i % 2 == 0 {
-                mask0.set_range_step(1..W, 2);
-            }
-        }
-        self.board.detla_swap(mask0.clone(), W - 1);
-
-        if W / 2 == 1 {
-            mask0 >>= 1;
-            self.board.detla_swap(mask0, W);
-        }
-
-        BitBoard256 { board: self.board }
-    }
 }
 
 impl<const W: usize, const H: usize> std::fmt::Debug for BitBoard256<W, H> {
