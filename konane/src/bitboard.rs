@@ -68,16 +68,16 @@ impl<const W: usize, const H: usize> BitBoard256<W, H> {
     pub fn get(&self, x: usize, y: usize) -> bool {
         assert!(x < W);
         assert!(y < H);
-        self.board.get(x + y * H)
+        self.board.get(x + y * W)
     }
 
     pub fn set(&mut self, x: usize, y: usize, value: bool) {
         assert!(x < W);
         assert!(y < H);
         if value {
-            self.board.set(x + y * H)
+            self.board.set(x + y * W)
         } else {
-            self.board.clear(x + y * H)
+            self.board.clear(x + y * W)
         }
     }
 }
@@ -97,5 +97,124 @@ impl<const W: usize, const H: usize> std::fmt::Debug for BitBoard256<W, H> {
             writeln!(f, "")?;
         }
         writeln!(f, "}}")
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::BitBoard256;
+
+    #[test]
+    pub fn set_get_clear_on_square_small() {
+        let mut board = BitBoard256::<8, 8>::new();
+        board.set(5, 2, true);
+        assert!(board.board.get(8 * 2 + 5));
+        assert!(board.get(5, 2));
+
+        board.set(1, 4, true);
+        assert!(board.board.get(8 * 4 + 1));
+        assert!(board.get(1, 4));
+
+        board.set(0, 2, true);
+        assert!(board.board.get(8 * 2 + 0));
+        assert!(board.get(0, 2));
+
+        board.set(0, 0, true);
+        assert!(board.board.get(0));
+        assert!(board.get(0, 0));
+
+        board.set(7, 7, true);
+        assert!(board.board.get(8 * 8 - 1));
+        assert!(board.get(7, 7));
+
+        board.set(5, 2, false);
+        board.set(0, 2, false);
+        board.set(0, 0, false);
+        board.set(7, 7, false);
+        board.set(1, 4, false);
+        assert!(board.board.is_empty());
+    }
+
+    #[test]
+    pub fn set_get_clear_on_small_rectangle() {
+        let mut board = BitBoard256::<3, 8>::new();
+        board.set(1, 5, true);
+        assert!(board.board.get(3 * 5 + 1));
+        assert!(board.get(1, 5));
+
+        board.set(0, 2, true);
+        assert!(board.board.get(3 * 2 + 0));
+        assert!(board.get(0, 2));
+
+        board.set(0, 0, true);
+        assert!(board.board.get(0));
+        assert!(board.get(0, 0));
+
+        board.set(2, 7, true);
+        assert!(board.board.get(3 * 8 - 1));
+        assert!(board.get(2, 7));
+
+        board.set(1, 5, false);
+        board.set(0, 2, false);
+        board.set(0, 0, false);
+        board.set(2, 7, false);
+        assert!(board.board.is_empty());
+    }
+
+    #[test]
+    pub fn set_get_clear_on_square_full() {
+        let mut board = BitBoard256::<8, 8>::new();
+        board.set(5, 2, true);
+        assert!(board.board.get(8 * 2 + 5));
+        assert!(board.get(5, 2));
+
+        board.set(1, 4, true);
+        assert!(board.board.get(8 * 4 + 1));
+        assert!(board.get(1, 4));
+
+        board.set(0, 2, true);
+        assert!(board.board.get(8 * 2 + 0));
+        assert!(board.get(0, 2));
+
+        board.set(0, 0, true);
+        assert!(board.board.get(0));
+        assert!(board.get(0, 0));
+
+        board.set(7, 7, true);
+        assert!(board.board.get(8 * 8 - 1));
+        assert!(board.get(7, 7));
+
+        board.set(5, 2, false);
+        board.set(1, 4, false);
+        board.set(0, 2, false);
+        board.set(0, 0, false);
+        board.set(7, 7, false);
+        assert!(board.board.is_empty());
+    }
+
+    #[test]
+    pub fn set_get_clear_on_full_rectangle() {
+        let mut board = BitBoard256::<64, 4>::new();
+        board.set(50, 3, true);
+        assert!(board.board.get(64 * 3 + 50));
+        assert!(board.get(50, 3));
+
+        board.set(0, 2, true);
+        assert!(board.board.get(64 * 2 + 0));
+        assert!(board.get(0, 2));
+
+        board.set(0, 0, true);
+        assert!(board.board.get(0));
+        assert!(board.get(0, 0));
+
+        board.set(63, 3, true);
+        assert!(board.board.get(64 * 4 - 1));
+        assert!(board.get(63, 3));
+
+        board.set(50, 3, false);
+        board.set(0, 2, false);
+        board.set(0, 0, false);
+        board.set(63, 3, false);
+        assert!(board.board.is_empty());
     }
 }
