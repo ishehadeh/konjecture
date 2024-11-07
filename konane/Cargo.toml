@@ -15,3 +15,10 @@ rayon = ["cgt/rayon"]
 name = "konane2canonical"
 required-features = ["cgt"]
 
+[dev-dependencies]
+criterion = "=0.5.1"
+
+[[bench]]
+name = "canonical"
+harness = false
+required-features = ["cgt"]

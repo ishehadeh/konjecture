@@ -2,23 +2,67 @@ pub mod bitboard;
 #[cfg(feature = "cgt")]
 pub mod cgt;
 
+use std::marker::PhantomData;
+
 use bitarray::BitArray;
 use bitboard::{BitBoard256, Direction};
+use const_direction::ConstDirection;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
+#[derive(Clone, Hash, PartialEq, Eq)]
 pub struct Konane256<const W: usize = 16, const H: usize = 16> {
     pub white: BitBoard256<W, H>,
     pub black: BitBoard256<W, H>,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum TileState {
     White,
     Black,
     Empty,
 }
 
+impl<const W: usize, const H: usize> std::fmt::Debug for Konane256<W, H> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Konane256<{}, {}> {{", W, H)?;
+        for y in 0..H {
+            write!(f, "   ")?;
+            for x in 0..W {
+                match self.get_tile(x, y) {
+                    TileState::White => write!(f, "x")?,
+                    TileState::Black => write!(f, "o")?,
+                    TileState::Empty => write!(f, "_")?,
+                }
+            }
+            writeln!(f, "")?;
+        }
+        writeln!(f, "}}")
+    }
+}
+
 impl<const W: usize, const H: usize> Konane256<W, H> {
+    /// x => white, o => black, _ => empty
+    pub fn must_parse(s: &str) -> Self {
+        let mut game = Self::empty();
+        for (y, row_txt) in s
+            .trim()
+            .split("\n")
+            .map(|row| row.trim())
+            .take(H)
+            .enumerate()
+        {
+            for (x, c) in row_txt.chars().take(W).enumerate() {
+                match c {
+                    'x' => game.set_tile(x, y, TileState::White),
+                    'o' => game.set_tile(x, y, TileState::Black),
+                    '_' => game.set_tile(x, y, TileState::Empty),
+                    _ => panic!("invalid tile character: {:?}", c),
+                }
+            }
+        }
+
+        game
+    }
+
     pub fn empty() -> Self {
         Self {
             white: BitBoard256::new(),
@@ -64,7 +108,7 @@ impl<const W: usize, const H: usize> Konane256<W, H> {
                 board.set_tile(
                     x,
                     y,
-                    if (x + y * 18) % 2 == 0 {
+                    if (x + y) % 2 == 0 {
                         TileState::Black
                     } else {
                         TileState::White
@@ -77,8 +121,8 @@ impl<const W: usize, const H: usize> Konane256<W, H> {
     }
 
     pub fn set_tile(&mut self, x: usize, y: usize, state: TileState) {
-        assert!(x < 18);
-        assert!(y < 18);
+        assert!(x < W);
+        assert!(y < H);
 
         match state {
             TileState::White => {
@@ -96,7 +140,7 @@ impl<const W: usize, const H: usize> Konane256<W, H> {
         }
     }
 
-    pub fn get_tile(&mut self, x: usize, y: usize) -> TileState {
+    pub fn get_tile(&self, x: usize, y: usize) -> TileState {
         match (self.black.get(x, y), self.white.get(x, y)) {
             (true, true) => panic!("Tile at <{}, {}> is marked for both black and white", x, y),
             (false, false) => TileState::Empty,
@@ -107,63 +151,278 @@ impl<const W: usize, const H: usize> Konane256<W, H> {
 
     pub fn empty_spaces(&self) -> BitArray<4, u64> {
         // get empty by selecting non-black spaces that don't have a white piece.
-        !self.black.board.clone() & !self.white.board.clone()
+        !self.black.board.clone() ^ &self.white.board
     }
 
-    pub fn moveset(&self, is_white: bool, dir: Direction) -> BitBoard256<W, H> {
-        let empty = self.empty_spaces();
-        let mut collected_moves = BitBoard256::new();
+    pub fn move_generator_white<'a, Dir: ConstDirection>(
+        &'a self,
+        _: Dir,
+    ) -> MoveGenerator<'a, Dir, W, H, true> {
+        MoveGenerator::new(self)
+    }
 
-        let mut current_moves: BitBoard256<W, H> = BitBoard256::border_mask(dir);
-        current_moves.board = !current_moves.board;
-        current_moves.board &= if is_white {
-            &self.white.board
-        } else {
-            &self.black.board
-        };
+    pub fn move_generator_black<'a, Dir: ConstDirection>(
+        &'a self,
+        _: Dir,
+    ) -> MoveGenerator<'a, Dir, W, H, false> {
+        MoveGenerator::new(self)
+    }
 
-        while !current_moves.board.is_empty() {
-            // 1. verify that there's a capture-able adjacent piece
-            match dir {
-                Direction::Right => current_moves.board <<= 1,
-                Direction::Left => current_moves.board >>= 1,
-                Direction::Up => current_moves.board >>= W,
-                Direction::Down => current_moves.board <<= W,
-            }
-            if is_white {
-                current_moves.board &= &self.black.board;
-            } else {
-                current_moves.board &= &self.white.board;
-            }
+    pub fn move_generator<'a, const IS_WHITE: bool, Dir: ConstDirection>(
+        &'a self,
+        _: Dir,
+    ) -> MoveGenerator<'a, Dir, W, H, IS_WHITE> {
+        MoveGenerator::new(self)
+    }
 
-            // 2. verify there's an empty space after the piece to be jumped
-            match dir {
-                Direction::Right => current_moves.board <<= 1,
-                Direction::Left => current_moves.board >>= 1,
-                Direction::Up => current_moves.board >>= W,
-                Direction::Down => current_moves.board <<= W,
+    pub fn all_moves_white(&self) -> Vec<Self> {
+        self.all_moves::<true>()
+    }
+
+    pub fn all_moves_black(&self) -> Vec<Self> {
+        self.all_moves::<false>()
+    }
+
+    pub fn all_moves<const IS_WHITE: bool>(&self) -> Vec<Self> {
+        let mut moves: Vec<Self> = Default::default();
+        let mut r = self.move_generator::<IS_WHITE, _>(const_direction::Right);
+        let mut l = self.move_generator::<IS_WHITE, _>(const_direction::Left);
+        let mut u = self.move_generator::<IS_WHITE, _>(const_direction::Up);
+        let mut d = self.move_generator::<IS_WHITE, _>(const_direction::Down);
+        while !r.is_complete() {
+            r.advance();
+            for mv in r.move_iter() {
+                moves.push(mv.apply(self.clone()))
             }
-            current_moves.board &= &empty;
-            collected_moves.board |= &current_moves.board;
+        }
+        while !l.is_complete() {
+            l.advance();
+            for mv in l.move_iter() {
+                moves.push(mv.apply(self.clone()))
+            }
+        }
+        while !u.is_complete() {
+            u.advance();
+            for mv in u.move_iter() {
+                moves.push(mv.apply(self.clone()))
+            }
+        }
+        while !d.is_complete() {
+            d.advance();
+            for mv in d.move_iter() {
+                moves.push(mv.apply(self.clone()))
+            }
         }
 
-        collected_moves
+        moves
+    }
+}
+
+#[derive(Debug)]
+pub struct MoveGenerator<
+    'a,
+    Dir: ConstDirection,
+    const W: usize,
+    const H: usize,
+    const IS_WHITE: bool,
+> {
+    game: &'a Konane256<W, H>,
+    moves: BitBoard256<W, H>,
+    hops: usize,
+    _dir: PhantomData<Dir>,
+}
+
+impl<'a, Dir: ConstDirection, const W: usize, const H: usize, const IS_WHITE: bool>
+    MoveGenerator<'a, Dir, W, H, IS_WHITE>
+{
+    pub const fn direction() -> Direction {
+        Dir::VALUE
+    }
+
+    pub fn is_complete(&self) -> bool {
+        self.moves.board.is_empty()
+    }
+
+    pub fn new(game: &'a Konane256<W, H>) -> Self {
+        let mut moves: BitBoard256<W, H> = BitBoard256::border_mask(Self::direction());
+        moves.board = !moves.board;
+        moves.board &= if IS_WHITE {
+            &game.white.board
+        } else {
+            &game.black.board
+        };
+        Self {
+            game,
+            moves,
+            hops: 0,
+            _dir: PhantomData,
+        }
+    }
+
+    /// "move" the pieces by using a bit shift on the board
+    fn shift(&mut self) {
+        match Self::direction() {
+            Direction::Right => self.moves.board <<= 1,
+            Direction::Left => self.moves.board >>= 1,
+            Direction::Up => self.moves.board >>= W,
+            Direction::Down => self.moves.board <<= W,
+        }
+    }
+
+    pub fn advance(&mut self) {
+        if self.moves.board.is_empty() {
+            return;
+        }
+
+        // 1. verify that there's a capture-able adjacent piece
+        self.shift();
+        if IS_WHITE {
+            self.moves.board &= &self.game.black.board;
+        } else {
+            self.moves.board &= &self.game.white.board;
+        }
+
+        // 2. verify there's an empty space after the piece to be jumped
+        self.shift();
+        self.game.empty_spaces();
+        self.moves.board &= self.game.empty_spaces();
+
+        self.hops += 1;
+    }
+
+    pub fn move_iter(&'a self) -> impl Iterator<Item = Move<'a, Dir, W, H, IS_WHITE>> {
+        self.moves.board.iter_set().map(|index| {
+            assert!(index < 256);
+            let index_u8 = index as u8;
+            Move {
+                move_to: index_u8,
+                hops: self.hops as u8,
+                _generator: PhantomData,
+            }
+        })
+    }
+}
+
+// TODO: remove usel lifetime
+#[derive(Debug, Clone, Copy)]
+pub struct Move<'a, Dir: ConstDirection, const W: usize, const H: usize, const IS_WHITE: bool> {
+    move_to: u8,
+    hops: u8,
+    _generator: PhantomData<MoveGenerator<'a, Dir, W, H, IS_WHITE>>,
+}
+
+impl<'a, Dir: ConstDirection, const W: usize, const H: usize, const IS_WHITE: bool>
+    Move<'a, Dir, W, H, IS_WHITE>
+{
+    pub fn apply(&self, mut game: Konane256<W, H>) -> Konane256<W, H> {
+        let step = Dir::VALUE.x() + Dir::VALUE.y() * W as isize;
+        let itarget = self.move_to as isize;
+        let original_pos = itarget + 2 * step * self.hops as isize;
+
+        let (current_board, opponent) = if IS_WHITE {
+            (&mut game.white.board, &mut game.black.board)
+        } else {
+            (&mut game.black.board, &mut game.white.board)
+        };
+        current_board.set(itarget as usize);
+        current_board.clear(original_pos as usize);
+
+        for i in 0..self.hops as isize {
+            opponent.clear((itarget + step + 2 * step * i) as usize);
+        }
+
+        game
+    }
+}
+
+mod const_direction {
+    use std::fmt::Debug;
+
+    use crate::bitboard::Direction;
+
+    pub trait ConstDirection: Debug {
+        const VALUE: Direction;
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct Up;
+    impl ConstDirection for Up {
+        const VALUE: Direction = Direction::Up;
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct Down;
+    impl ConstDirection for Down {
+        const VALUE: Direction = Direction::Down;
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct Left;
+    impl ConstDirection for Left {
+        const VALUE: Direction = Direction::Left;
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+    pub struct Right;
+    impl ConstDirection for Right {
+        const VALUE: Direction = Direction::Right;
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        bitboard::{BitBoard256, Direction},
-        Konane256,
-    };
+    use std::collections::HashSet;
+
+    use crate::{Konane256, TileState};
 
     #[test]
     pub fn checkerboard_16x16() {
         let board: Konane256<16, 16> = Konane256::checkerboard();
-        for i in 0..(16 * 16 - 1) {
-            assert_eq!(board.black.board.get(i), board.white.board.get(i + 1));
+        for x in 0..16 {
+            for y in 0..16 {
+                assert_ne!(board.get_tile(x, y), TileState::Empty);
+                if x > 0 {
+                    assert_ne!(board.get_tile(x, y), board.get_tile(x - 1, y));
+                }
+                if y > 1 {
+                    assert_ne!(board.get_tile(x, y), board.get_tile(x, y - 1));
+                }
+            }
         }
+    }
+
+    #[test]
+    pub fn move_near_block_boundary() {
+        let board: Konane256<256, 1> = Konane256::must_parse(
+            r#"_oxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxox"#,
+        );
+
+        let w = Konane256::must_parse(
+            r#"x__oxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxox"#,
+        );
+        let b = Konane256::must_parse(
+            r#"_oxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxox__o"#,
+        );
+
+        assert_eq!(board.all_moves_white(), vec![w]);
+        assert_eq!(board.all_moves_black(), vec![b]);
+    }
+
+    #[test]
+    pub fn move_over_block_boundary() {
+        let board: Konane256<256, 1> = Konane256::must_parse(
+            r#"_oxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxox"#,
+        );
+
+        let w = Konane256::must_parse(
+            r#"x__oxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxox"#,
+        );
+        let b = Konane256::must_parse(
+            r#"_oxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxox__o"#,
+        );
+
+        assert_eq!(board.all_moves_white(), vec![w]);
+        assert_eq!(board.all_moves_black(), vec![b]);
     }
 
     #[test]
@@ -172,230 +431,118 @@ mod test {
         dbg!(board.empty_spaces());
         dbg!(&board.white);
         dbg!(&board.black);
-        let w_r = board.moveset(true, Direction::Right);
-        let b_r = board.moveset(false, Direction::Right);
-        let w_l = board.moveset(true, Direction::Left);
-        let b_l = board.moveset(false, Direction::Left);
-        let w_u = board.moveset(true, Direction::Up);
-        let b_u = board.moveset(false, Direction::Up);
-        let w_d = board.moveset(true, Direction::Down);
-        let b_d = board.moveset(false, Direction::Down);
 
-        assert_eq!(w_r, BitBoard256::new());
-        assert_eq!(b_r, BitBoard256::new());
-        assert_eq!(w_l, BitBoard256::new());
-        assert_eq!(b_l, BitBoard256::new());
-        assert_eq!(w_u, BitBoard256::new());
-        assert_eq!(b_u, BitBoard256::new());
-        assert_eq!(w_d, BitBoard256::new());
-        assert_eq!(b_d, BitBoard256::new());
+        assert_eq!(board.all_moves_black(), vec![]);
+        assert_eq!(board.all_moves_white(), vec![]);
     }
 
     #[test]
     pub fn moveset_white_right_jump() {
-        use crate::TileState::{Black, White};
-
-        let board: Konane256 = Konane256::small_at((0, 0), (1, 2), &[White, Black]);
-        let mut expected_w_r = BitBoard256::new();
-        expected_w_r.set(2, 0, true);
-        let w_r = board.moveset(true, Direction::Right);
-        let b_r = board.moveset(false, Direction::Right);
-        let w_l = board.moveset(true, Direction::Left);
-        let b_l = board.moveset(false, Direction::Left);
-        let w_u = board.moveset(true, Direction::Up);
-        let b_u = board.moveset(false, Direction::Up);
-        let w_d = board.moveset(true, Direction::Down);
-        let b_d = board.moveset(false, Direction::Down);
-
-        assert_eq!(w_r, expected_w_r);
-        assert_eq!(b_r, BitBoard256::new());
-        assert_eq!(w_l, BitBoard256::new());
-        assert_eq!(b_l, BitBoard256::new());
-        assert_eq!(w_u, BitBoard256::new());
-        assert_eq!(b_u, BitBoard256::new());
-        assert_eq!(w_d, BitBoard256::new());
-        assert_eq!(b_d, BitBoard256::new());
+        let board: Konane256 = Konane256::must_parse("xo");
+        assert_eq!(board.all_moves_white(), vec![Konane256::must_parse("__x")]);
+        assert_eq!(board.all_moves_black(), vec![]);
     }
 
     #[test]
     pub fn moveset_black_right_jump() {
-        use crate::TileState::{Black, White};
-
-        let board: Konane256 = Konane256::small_at((0, 0), (1, 2), &[Black, White]);
-        let mut expected_b_r = BitBoard256::new();
-        expected_b_r.set(2, 0, true);
-        let w_r = board.moveset(true, Direction::Right);
-        let b_r = board.moveset(false, Direction::Right);
-        let w_l = board.moveset(true, Direction::Left);
-        let b_l = board.moveset(false, Direction::Left);
-        let w_u = board.moveset(true, Direction::Up);
-        let b_u = board.moveset(false, Direction::Up);
-        let w_d = board.moveset(true, Direction::Down);
-        let b_d = board.moveset(false, Direction::Down);
-
-        assert_eq!(w_r, BitBoard256::new());
-        assert_eq!(b_r, expected_b_r);
-        assert_eq!(w_l, BitBoard256::new());
-        assert_eq!(b_l, BitBoard256::new());
-        assert_eq!(w_u, BitBoard256::new());
-        assert_eq!(b_u, BitBoard256::new());
-        assert_eq!(w_d, BitBoard256::new());
-        assert_eq!(b_d, BitBoard256::new());
+        let board: Konane256 = Konane256::must_parse("ox");
+        assert_eq!(board.all_moves_black(), vec![Konane256::must_parse("__o")]);
+        assert_eq!(board.all_moves_white(), vec![]);
     }
 
     #[test]
     pub fn moveset_white_left_jump() {
-        use crate::TileState::{Black, White};
-
-        let board: Konane256 = Konane256::small_at((1, 0), (1, 3), &[Black, White, White]);
-        let mut expected_w_l = BitBoard256::new();
-        expected_w_l.set(0, 0, true);
-        let w_r = board.moveset(true, Direction::Right);
-        let b_r = board.moveset(false, Direction::Right);
-        let w_l = board.moveset(true, Direction::Left);
-        let b_l = board.moveset(false, Direction::Left);
-        let w_u = board.moveset(true, Direction::Up);
-        let b_u = board.moveset(false, Direction::Up);
-        let w_d = board.moveset(true, Direction::Down);
-        let b_d = board.moveset(false, Direction::Down);
-
-        assert_eq!(w_r, BitBoard256::new());
-        assert_eq!(b_r, BitBoard256::new());
-        assert_eq!(w_l, expected_w_l);
-        assert_eq!(b_l, BitBoard256::new());
-        assert_eq!(w_u, BitBoard256::new());
-        assert_eq!(b_u, BitBoard256::new());
-        assert_eq!(w_d, BitBoard256::new());
-        assert_eq!(b_d, BitBoard256::new());
+        let board: Konane256 = Konane256::must_parse("_oxx");
+        assert_eq!(board.all_moves_white(), vec![Konane256::must_parse("x__x")]);
+        assert_eq!(board.all_moves_black(), vec![]);
     }
 
     #[test]
     pub fn moveset_black_left_jump() {
-        use crate::TileState::{Black, White};
-
-        let board: Konane256 = Konane256::small_at((1, 0), (1, 3), &[White, Black, Black]);
-        let mut expected_b_l = BitBoard256::new();
-        expected_b_l.set(0, 0, true);
-        let w_r = board.moveset(true, Direction::Right);
-        let b_r = board.moveset(false, Direction::Right);
-        let w_l = board.moveset(true, Direction::Left);
-        let b_l = board.moveset(false, Direction::Left);
-        let w_u = board.moveset(true, Direction::Up);
-        let b_u = board.moveset(false, Direction::Up);
-        let w_d = board.moveset(true, Direction::Down);
-        let b_d = board.moveset(false, Direction::Down);
-
-        assert_eq!(w_r, BitBoard256::new());
-        assert_eq!(b_r, BitBoard256::new());
-        assert_eq!(w_l, BitBoard256::new());
-        assert_eq!(b_l, expected_b_l);
-        assert_eq!(w_u, BitBoard256::new());
-        assert_eq!(b_u, BitBoard256::new());
-        assert_eq!(w_d, BitBoard256::new());
-        assert_eq!(b_d, BitBoard256::new());
+        let board: Konane256 = Konane256::must_parse("_xoo");
+        assert_eq!(board.all_moves_black(), vec![Konane256::must_parse("o__o")]);
+        assert_eq!(board.all_moves_white(), vec![]);
     }
 
     #[test]
     pub fn moveset_white_up_jump() {
-        use crate::TileState::{Black, White};
-
-        let board: Konane256 = Konane256::small_at((0, 1), (3, 1), &[Black, White, White]);
-        let mut expected_w_u = BitBoard256::new();
-        expected_w_u.set(0, 0, true);
-        let w_r = board.moveset(true, Direction::Right);
-        let b_r = board.moveset(false, Direction::Right);
-        let w_l = board.moveset(true, Direction::Left);
-        let b_l = board.moveset(false, Direction::Left);
-        let w_u = board.moveset(true, Direction::Up);
-        let b_u = board.moveset(false, Direction::Up);
-        let w_d = board.moveset(true, Direction::Down);
-        let b_d = board.moveset(false, Direction::Down);
-
-        assert_eq!(w_r, BitBoard256::new());
-        assert_eq!(b_r, BitBoard256::new());
-        assert_eq!(w_l, BitBoard256::new());
-        assert_eq!(b_l, BitBoard256::new());
-        assert_eq!(w_u, expected_w_u);
-        assert_eq!(b_u, BitBoard256::new());
-        assert_eq!(w_d, BitBoard256::new());
-        assert_eq!(b_d, BitBoard256::new());
+        let board: Konane256 = Konane256::must_parse("_\no\nx\nx");
+        assert_eq!(
+            board.all_moves_white(),
+            vec![Konane256::must_parse("x\n\n\nx")]
+        );
+        assert_eq!(board.all_moves_black(), vec![]);
     }
 
     #[test]
     pub fn moveset_black_up_jump() {
-        use crate::TileState::{Black, White};
-
-        let board: Konane256 = Konane256::small_at((0, 1), (3, 1), &[White, Black, Black]);
-        let mut expected_b_u = BitBoard256::new();
-        expected_b_u.set(0, 0, true);
-        let w_r = board.moveset(true, Direction::Right);
-        let b_r = board.moveset(false, Direction::Right);
-        let w_l = board.moveset(true, Direction::Left);
-        let b_l = board.moveset(false, Direction::Left);
-        let w_u = board.moveset(true, Direction::Up);
-        let b_u = board.moveset(false, Direction::Up);
-        let w_d = board.moveset(true, Direction::Down);
-        let b_d = board.moveset(false, Direction::Down);
-
-        assert_eq!(w_r, BitBoard256::new());
-        assert_eq!(b_r, BitBoard256::new());
-        assert_eq!(w_l, BitBoard256::new());
-        assert_eq!(b_l, BitBoard256::new());
-        assert_eq!(w_u, BitBoard256::new());
-        assert_eq!(b_u, expected_b_u);
-        assert_eq!(w_d, BitBoard256::new());
-        assert_eq!(b_d, BitBoard256::new());
+        let board: Konane256 = Konane256::must_parse("_\nx\no\no");
+        assert_eq!(
+            board.all_moves_black(),
+            vec![Konane256::must_parse("o\n\n\no")]
+        );
+        assert_eq!(board.all_moves_white(), vec![]);
     }
 
     #[test]
     pub fn moveset_white_down_jump() {
-        use crate::TileState::{Black, White};
-
-        let board: Konane256 = Konane256::small_at((0, 0), (2, 1), &[White, Black]);
-        let mut expected_w_d = BitBoard256::new();
-        expected_w_d.set(0, 2, true);
-        let w_r = board.moveset(true, Direction::Right);
-        let b_r = board.moveset(false, Direction::Right);
-        let w_l = board.moveset(true, Direction::Left);
-        let b_l = board.moveset(false, Direction::Left);
-        let w_u = board.moveset(true, Direction::Up);
-        let b_u = board.moveset(false, Direction::Up);
-        let w_d = board.moveset(true, Direction::Down);
-        let b_d = board.moveset(false, Direction::Down);
-
-        assert_eq!(w_r, BitBoard256::new());
-        assert_eq!(b_r, BitBoard256::new());
-        assert_eq!(w_l, BitBoard256::new());
-        assert_eq!(b_l, BitBoard256::new());
-        assert_eq!(w_u, BitBoard256::new());
-        assert_eq!(b_u, BitBoard256::new());
-        assert_eq!(w_d, expected_w_d);
-        assert_eq!(b_d, BitBoard256::new());
+        let board: Konane256 = Konane256::must_parse("x\no");
+        assert_eq!(
+            board.all_moves_white(),
+            vec![Konane256::must_parse("_\n\nx")]
+        );
+        assert_eq!(board.all_moves_black(), vec![]);
     }
 
     #[test]
     pub fn moveset_black_down_jump() {
-        use crate::TileState::{Black, White};
+        let board: Konane256 = Konane256::must_parse("o\nx");
+        assert_eq!(
+            board.all_moves_black(),
+            vec![Konane256::must_parse("_\n\no")]
+        );
+        assert_eq!(board.all_moves_white(), vec![]);
+    }
 
-        let board: Konane256 = Konane256::small_at((0, 0), (2, 1), &[Black, White]);
-        let mut expected_b_d = BitBoard256::new();
-        expected_b_d.set(0, 2, true);
-        let w_r = board.moveset(true, Direction::Right);
-        let b_r = board.moveset(false, Direction::Right);
-        let w_l = board.moveset(true, Direction::Left);
-        let b_l = board.moveset(false, Direction::Left);
-        let w_u = board.moveset(true, Direction::Up);
-        let b_u = board.moveset(false, Direction::Up);
-        let w_d = board.moveset(true, Direction::Down);
-        let b_d = board.moveset(false, Direction::Down);
-
-        assert_eq!(w_r, BitBoard256::new());
-        assert_eq!(b_r, BitBoard256::new());
-        assert_eq!(w_l, BitBoard256::new());
-        assert_eq!(b_l, BitBoard256::new());
-        assert_eq!(w_u, BitBoard256::new());
-        assert_eq!(b_u, BitBoard256::new());
-        assert_eq!(w_d, BitBoard256::new());
-        assert_eq!(b_d, expected_b_d);
+    #[test]
+    pub fn linear_tail_1_with_4_stones() {
+        let board: Konane256 = Konane256::must_parse(
+            r#"_____
+               _oxo_
+               _x___
+               _____"#,
+        );
+        assert_eq!(
+            board.all_moves_black(),
+            vec![Konane256::must_parse(
+                r#"_____
+                   __xo_
+                   _____
+                   _o___"#
+            )]
+        );
+        assert_eq!(
+            HashSet::from_iter(board.all_moves_white().into_iter()),
+            HashSet::from([
+                Konane256::must_parse(
+                    r#"_____
+                       _o__x
+                       _x___
+                       _____"#
+                ),
+                Konane256::must_parse(
+                    r#"_____
+                       x__o_
+                       _x___
+                       _____"#
+                ),
+                Konane256::must_parse(
+                    r#"_x___
+                       __xo_
+                       _____
+                       _____"#
+                ),
+            ])
+        );
     }
 }
