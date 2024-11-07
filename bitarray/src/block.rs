@@ -117,7 +117,7 @@ macro_rules! impl_bit_array_block {
             fn last_set(&self) -> Option<usize> {
                 match (*self).leading_zeros() as usize {
                     Self::BLOCK_LENGTH => None,
-                    i => Some(i),
+                    i => Some(Self::BLOCK_LENGTH - 1 - i),
                 }
             }
 
@@ -133,7 +133,7 @@ macro_rules! impl_bit_array_block {
             fn last_clear(&self) -> Option<usize> {
                 match (*self).leading_ones() as usize {
                     Self::BLOCK_LENGTH => None,
-                    i => Some(i),
+                    i => Some(Self::BLOCK_LENGTH - 1 - i),
                 }
             }
 
@@ -156,3 +156,56 @@ impl_bit_array_block!(u32, bits = 32);
 impl_bit_array_block!(u64, bits = 64);
 impl_bit_array_block!(u128, bits = 128);
 impl_bit_array_block!(usize, bits = usize::BITS as usize);
+
+#[cfg(test)]
+mod test {
+    use crate::BitArrayBlock;
+    use proptest::{bits, prelude::*};
+
+    proptest! {
+        #[test]
+        fn first_set(block in bits::u64::ANY) {
+            match block.first_set() {
+                None => prop_assert!(block == 0, "block={block:064b}, but block.first_set() returned None"),
+                Some(i) => {
+                    prop_assert!(block & (1u64 << i) != 0, "block={block:064b}, and block.first_set() = {i}, but bit #{i} is not set (i.e. block & {mask:064b} != 0)", mask = (1u64 << i));
+                    prop_assert!(block & !(u64::MAX << i) == 0, "block={block:064b}, and block.first_set() = {i}, but bit prior bits are set");
+                }
+            }
+        }
+        #[test]
+        fn last_set(block in bits::u64::ANY) {
+            match block.last_set() {
+                None => prop_assert!(block == 0, "block={block:064b}, but block.last_set() returned None"),
+                Some(i) => {
+                    prop_assert!(block & (1u64 << i) > 0, "block={block:064b}, and block.first_set() = {i}, but bit #{i} is not set (i.e. block & {mask:064b} != 0)", mask = (1u64 << i));
+                    if i != 63 {
+                    prop_assert!(block & (u64::MAX << i + 1) == 0, "block={block:064b}, and block.first_set() = {i}, but bit later bits are set");
+                    }
+                }
+            }
+        }
+        #[test]
+        fn first_clear(block in bits::u64::ANY) {
+            match block.first_clear() {
+                None => prop_assert!(block == u64::MAX, "block={block:064b}, but block.first_clear() returned None"),
+                Some(i) => {
+                    prop_assert!(!block & (1u64 << i) != 0, "block={block:064b}, and block.first_set() = {i}, but bit #{i} is not set (i.e. block & {mask:064b} != 0)", mask = (1u64 << i));
+                    prop_assert!(!block & !(u64::MAX << i) == 0, "block={block:064b}, and block.first_set() = {i}, but bit prior bits are set");
+                }
+            }
+        }
+        #[test]
+        fn last_clear(block in bits::u64::ANY) {
+            match block.last_clear() {
+                None => prop_assert!(block == u64::MAX, "block={block:064b}, but block.last_clear() returned None"),
+                Some(i) => {
+                    prop_assert!(!block & (1u64 << i) > 0, "block={block:064b}, and block.last_clear() = {i}, but bit #{i} is not set (i.e. !block & {mask:064b} != 0)", mask = (1u64 << i));
+                    if i != 63 {
+                    prop_assert!(!block & (u64::MAX << i + 1) == 0, "block={block:064b}, and block.last_clear() = {i}, but bit later bits are set");
+                    }
+                }
+            }
+        }
+    }
+}
