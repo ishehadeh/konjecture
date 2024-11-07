@@ -48,9 +48,9 @@ impl<const W: usize, const H: usize> BitBoard256<W, H> {
         assert!(W * H <= 256);
         assert!(W > 0);
         assert!(H > 0);
-        let mut board = BitArray::new();
-        // board.set_range(W * H..board.bits());
-        Self { board }
+        Self {
+            board: BitArray::new(),
+        }
     }
 
     pub fn border_mask(dir: Direction) -> Self {
