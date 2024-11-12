@@ -1,8 +1,11 @@
 use crate::{bitboard::BitBoard256, Konane256};
+pub use nearest_border::*;
+mod nearest_border;
 
 pub trait InvariantValue {}
 
 impl InvariantValue for u64 {}
+impl InvariantValue for f64 {}
 impl InvariantValue for usize {}
 
 macro_rules! tuple_invariant_value {
