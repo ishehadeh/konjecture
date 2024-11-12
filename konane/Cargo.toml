@@ -6,6 +6,8 @@ edition = "2021"
 [dependencies]
 bitarray = { path = "../bitarray" }
 cgt = { version = "0.5", optional = true }
+sled = "*"
+thiserror = "*"
 
 [features]
 cgt = ["dep:cgt"]

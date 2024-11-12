@@ -1,9 +1,8 @@
 pub mod bitboard;
 #[cfg(feature = "cgt")]
 pub mod cgt;
-
 use std::marker::PhantomData;
-
+pub mod invariant;
 use bitarray::BitArray;
 use bitboard::{BitBoard256, Direction};
 use const_direction::ConstDirection;
