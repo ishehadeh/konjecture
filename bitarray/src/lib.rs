@@ -9,6 +9,7 @@ use block::BitArrayBlock;
 use iter::BitArrayIter;
 
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd)]
+#[repr(transparent)]
 pub struct BitArray<const BLOCK_COUNT: usize, Block: BitArrayBlock = u64> {
     // blocks are stored in reverse order
     blocks: [Block; BLOCK_COUNT],

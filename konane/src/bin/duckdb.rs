@@ -1,6 +1,15 @@
+use std::{
+    fmt::{format, Write},
+    path::Display,
+    time::Duration,
+};
+
 use duckdb::{types::Value, Connection};
 use itertools::Itertools;
-use konane::{bitboard::BitBoard256, Konane256, TileState};
+use konane::{
+    bitboard::{BitBoard256, Direction},
+    Konane256, TileState,
+};
 use thiserror::Error;
 
 const W: usize = 11;
@@ -202,7 +211,7 @@ impl<'a> KonaneMoveAppender<'a> {
     }
 }
 
-pub fn main() {
+pub fn get_moves_rust() {
     let conn = Connection::open("konane.duckdb").expect("failed to open duckdb connection");
     let mut stmt_collect_games = conn
         .prepare("SELECT (black, white) FROM konane")
@@ -248,5 +257,83 @@ pub fn main() {
         }
 
         println!("END batch")
+    }
+}
+
+pub struct GetMoveMaskSql {
+    pub dir: Direction,
+    pub is_black: bool,
+    pub width: usize,
+    pub hops: usize,
+}
+
+impl GetMoveMaskSql {
+    pub fn dir_char(&self) -> char {
+        match self.dir {
+            Direction::Up => 'u',
+            Direction::Down => 'd',
+            Direction::Left => 'l',
+            Direction::Right => 'r',
+        }
+    }
+
+    pub fn next_player_char(&self) -> char {
+        match self.is_black {
+            true => 'b',
+            false => 'w',
+        }
+    }
+
+    pub fn prev_player_char(&self) -> char {
+        match self.is_black {
+            true => 'w',
+            false => 'b',
+        }
+    }
+}
+
+impl std::fmt::Display for GetMoveMaskSql {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let n = self.next_player_char();
+        let p = self.prev_player_char();
+        let op = match self.dir {
+            Direction::Up | Direction::Left => ">>",
+            Direction::Down | Direction::Right => "<<",
+        };
+        let shift = match self.dir {
+            Direction::Up | Direction::Down => W,
+            Direction::Left | Direction::Right => 1,
+        };
+
+        for _ in 0..self.hops * 3 {
+            f.write_char('(')?;
+        }
+
+        f.write_char(n)?;
+        for _ in 0..self.hops {
+            write!(f, " {op} {shift}) & {p}) {op} {shift}) & empty_space(b, w)")?;
+        }
+        Ok(())
+    }
+}
+
+pub fn main() {
+    println!("CREATE MACRO empty_space(b, w) AS ~b & ~w;");
+    for is_black in [true, false] {
+        for dir in Direction::all() {
+            for hops in 1..=W / 2 {
+                let move_mask = GetMoveMaskSql {
+                    dir,
+                    is_black,
+                    width: W,
+                    hops,
+                };
+                println!(
+                    "CREATE MACRO moves_{}{}{hops}(b, w) AS {move_mask};",
+                    move_mask.next_player_char(),
+                    move_mask.dir_char(),
+                );
+            }
+        }
     }
 }
