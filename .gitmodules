@@ -1,0 +1,3 @@
+[submodule "conjecturing"]
+	path = conjecturing
+	url = https://github.com/nvcleemp/conjecturing
