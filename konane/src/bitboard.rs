@@ -33,6 +33,7 @@ impl Direction {
 }
 
 #[derive(Clone, PartialEq, Eq, Hash)]
+#[repr(transparent)]
 pub struct BitBoard256<const W: usize, const H: usize> {
     pub board: BitArray<4, u64>,
 }
