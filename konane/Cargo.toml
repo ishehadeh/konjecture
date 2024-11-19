@@ -6,16 +6,29 @@ edition = "2021"
 [dependencies]
 bitarray = { path = "../bitarray" }
 cgt = { version = "0.5", optional = true }
-sled = "*"
+rand = { version = "*", optional = true }
+duckdb = { version = "=1.1.1", optional = true, features = ["bundled"] }
+itertools = "*"
 thiserror = "*"
 
 [features]
 cgt = ["dep:cgt"]
+rand = ["dep:rand"]
 rayon = ["cgt/rayon"]
+duckdb = ["dep:duckdb"]
 
 [[bin]]
 name = "konane2canonical"
 required-features = ["cgt"]
+
+[[bin]]
+name = "generate-conjecturing-input"
+required-features = ["rand", "cgt"]
+
+[[bin]]
+name = "duckdb"
+required-features = ["duckdb"]
+
 
 [dev-dependencies]
 criterion = "=0.5.1"

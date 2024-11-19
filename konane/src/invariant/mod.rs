@@ -150,6 +150,15 @@ impl SinglePlayerInvariant for PieceHeight {
     }
 }
 
+pub struct PieceCount;
+impl SinglePlayerInvariant for PieceCount {
+    type Value = usize;
+
+    fn compute<const W: usize, const H: usize>(&self, game: BitBoard256<W, H>) -> Self::Value {
+        game.board.iter_set().count()
+    }
+}
+
 /// distance between the first and last column with at least one peice
 pub struct PieceWidth;
 impl SinglePlayerInvariant for PieceWidth {
