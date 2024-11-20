@@ -1,9 +1,7 @@
-use std::{
-    fmt::{format, Write},
-    path::Display,
-    time::Duration,
-};
+use std::fmt::Write;
 
+use cgt::short::partizan::transposition_table::ParallelTranspositionTable;
+use cgt::short::partizan::{canonical_form::CanonicalForm, partizan_game::PartizanGame};
 use duckdb::{types::Value, Connection};
 use itertools::Itertools;
 use konane::{
@@ -317,23 +315,101 @@ impl std::fmt::Display for GetMoveMaskSql {
     }
 }
 
-pub fn main() {
-    println!("CREATE MACRO empty_space(b, w) AS ~b & ~w;");
+pub fn write_macros(mut out: impl std::fmt::Write, width: usize) -> std::fmt::Result {
+    writeln!(out, "CREATE MACRO empty_space(b, w) AS ~b & ~w;")?;
     for is_black in [true, false] {
         for dir in Direction::all() {
-            for hops in 1..=W / 2 {
+            for hops in 1..=width / 2 {
                 let move_mask = GetMoveMaskSql {
                     dir,
                     is_black,
-                    width: W,
+                    width,
                     hops,
                 };
-                println!(
+                writeln!(
+                    out,
                     "CREATE MACRO moves_{}{}{hops}(b, w) AS {move_mask};",
                     move_mask.next_player_char(),
                     move_mask.dir_char(),
-                );
+                )?;
             }
         }
+    }
+    Ok(())
+}
+
+pub fn main() {
+    let mark_empty_moves = r#"
+    UPDATE konane AS k
+    SET num_numerator = 0, num_denom_exp = 0
+    WHERE moves_br1(k.black, k.white) = 0
+      AND moves_bl1(k.black, k.white) = 0
+      AND moves_bu1(k.black, k.white) = 0
+      AND moves_bd1(k.black, k.white) = 0
+      AND moves_wr1(k.black, k.white) = 0
+      AND moves_wl1(k.black, k.white) = 0
+      AND moves_wu1(k.black, k.white) = 0
+      AND moves_wd1(k.black, k.white);
+"#;
+
+    let conn = Connection::open("konane.duckdb").expect("failed to open duckdb connection");
+    // conn.execute_batch(&mark_empty_moves)
+    //     .expect("failed to mark empty moves");
+
+    let mut no_val_games = conn
+        .prepare("SELECT (black, white) FROM konane WHERE num_numerator is NULL AND num_denom_exp is NULL AND nimber is NULL AND up is NULL")
+        .expect("failed to prepare query");
+
+    let mut set_nus = conn
+        .prepare("UPDATE konane SET num_numerator = ?, num_denom_exp = ?, nimber = ?, up = ? WHERE black = ? AND white = ?")
+        .expect("failed to prepare query");
+
+    let games = no_val_games.query_arrow([]).expect("query failed");
+    let tt = ParallelTranspositionTable::new();
+    for game in games {
+        println!("BEGIN batch ({} records)", game.num_rows());
+        let data = game.column(0).to_data();
+        let [black, white] = data.child_data() else {
+            panic!("expected a two element struct");
+        };
+        for (black_buffer, white_buffer) in black.buffers().iter().zip(white.buffers().iter()) {
+            let black_pos_data = black_buffer.typed_data::<u64>();
+            let white_pos_data = white_buffer.typed_data::<u64>();
+
+            println!("  BEGIN buffer ({} positions)", black_pos_data.len() / 2);
+            for i in 0..(black_pos_data.len() / 2) {
+                let game = Konane256::<W, H> {
+                    white: BitBoard256 {
+                        board: [0, 0, white_pos_data[i + 1], white_pos_data[i]].into(),
+                    },
+
+                    black: BitBoard256 {
+                        board: [0, 0, black_pos_data[i + 1], black_pos_data[i]].into(),
+                    },
+                };
+                let canonical_form = game.canonical_form(&tt);
+                if let Some(nus) = canonical_form.to_nus() {
+                    let white_128 =
+                        (white_pos_data[i + 1] as i128) << 64 | white_pos_data[i] as i128;
+                    let black_128 =
+                        (black_pos_data[i + 1] as i128) << 64 | black_pos_data[i] as i128;
+                    set_nus
+                        .execute([
+                            Value::Int(nus.number().numerator() as i32),
+                            Value::UInt(nus.number().denominator_exponent()),
+                            Value::UInt(nus.nimber().value()),
+                            Value::Int(nus.up_multiple()),
+                            Value::HugeInt(black_128),
+                            Value::HugeInt(white_128),
+                        ])
+                        .expect("failed to update with NUS");
+                } else {
+                    println!("non-nus game");
+                }
+            }
+            println!("  END buffer")
+        }
+
+        println!("END batch")
     }
 }

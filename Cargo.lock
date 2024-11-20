@@ -405,8 +405,6 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 [[package]]
 name = "cgt"
 version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "efc4455d4dddd85b7bda769834e8be7411bfde6235c57435da7edf7191e3cc5f"
 dependencies = [
  "ahash 0.8.11",
  "append-only-vec",
@@ -414,6 +412,7 @@ dependencies = [
  "cgt_derive",
  "dashmap",
  "itertools",
+ "mint",
  "nom",
  "num-rational",
  "rand",
@@ -423,8 +422,6 @@ dependencies = [
 [[package]]
 name = "cgt_derive"
 version = "0.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f3812605f55a535a5b41bf705c699c38aed12dced19394ff45810e48a295d60a"
 dependencies = [
  "quote",
  "syn 2.0.86",
@@ -1027,6 +1024,12 @@ checksum = "e2d80299ef12ff69b16a84bb182e3b9df68b5a91574d3d4fa6e41b65deec4df1"
 dependencies = [
  "adler2",
 ]
+
+[[package]]
+name = "mint"
+version = "0.5.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e53debba6bda7a793e5f99b8dacf19e626084f525f7829104ba9898f367d85ff"
 
 [[package]]
 name = "nom"
