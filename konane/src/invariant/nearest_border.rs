@@ -1,17 +1,15 @@
+use crate::{BitBoard, Konane256};
+
 use super::SinglePlayerInvariant;
 
 pub struct NearestBorder;
 
-impl SinglePlayerInvariant for NearestBorder {
-    type Value = f64;
-
-    fn compute<const W: usize, const H: usize>(
-        &self,
-        player: crate::bitboard::BitBoard256<W, H>,
-    ) -> Self::Value {
-        player
-            .board
-            .iter_set()
+impl<const W: usize, const H: usize, B: BitBoard> SinglePlayerInvariant<Konane256<W, H, B>>
+    for NearestBorder
+{
+    fn compute(&self, player: B) -> f64 {
+        (0..B::BIT_LENGTH)
+            .filter(|&index| B::one() << index & &player != B::empty())
             .map(|piece| {
                 let y = piece / W;
                 let x = piece - W * y;

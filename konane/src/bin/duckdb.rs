@@ -338,6 +338,24 @@ pub fn write_macros(mut out: impl std::fmt::Write, width: usize) -> std::fmt::Re
     Ok(())
 }
 
+pub fn migration0() {
+    conn.execute_batch(
+        r"
+            CREATE TABLE IF NOT EXISTS konane(
+                black UHUGEINT,
+                white UHUGEINT,
+                
+                PRIMARY KEY(black, white),
+                UNIQUE(black, white));
+
+            CREATE TABLE IF NOT EXISTS moves(
+                is_left BOOLEAN,
+                from_white UHUGEINT, from_black UHUGEINT,
+                to_white UHUGEINT, to_black UHUGEINT);
+         ",
+    )
+}
+
 pub fn main() {
     let mark_empty_moves = r#"
     UPDATE konane AS k

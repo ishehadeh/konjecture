@@ -1,8 +1,12 @@
+use std::hash::Hash;
+
 use cgt::short::partizan::partizan_game::PartizanGame;
 
-use crate::Konane256;
+use crate::{BitBoard, Konane256};
 
-impl<const W: usize, const H: usize> PartizanGame for Konane256<W, H> {
+impl<const W: usize, const H: usize, B: BitBoard + Hash + Send + Sync> PartizanGame
+    for Konane256<W, H, B>
+{
     fn left_moves(&self) -> Vec<Self> {
         self.all_moves_black()
     }
@@ -14,6 +18,7 @@ impl<const W: usize, const H: usize> PartizanGame for Konane256<W, H> {
 
 #[cfg(test)]
 mod test {
+    use bitarray::BitArray;
     use cgt::{
         numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber},
         short::partizan::{
@@ -26,26 +31,19 @@ mod test {
     use crate::{Konane256, TileState};
 
     fn gen_solid_linear_pattern(n: usize) -> Konane256<256, 1> {
-        let alternating = 0xAAAAAAAAAAAAAAAAu64;
-        assert!(alternating | (alternating >> 1) == u64::MAX);
-
         let mut game = Konane256::<256, 1>::empty();
-        let bits_needed = n as usize + 1;
-        let n_blocks_rounded_up = (bits_needed + 63) / 64;
-
-        for i in (4 - n_blocks_rounded_up..4).rev() {
-            game.black.board.blocks_mut()[i] = alternating;
-            game.white.board.blocks_mut()[i] = alternating << 1;
-            if i < 3 {
-                game.white.board.blocks_mut()[i] |= 1;
-            }
+        for x in 1..=n {
+            game.set_tile(
+                x,
+                0,
+                if x % 2 == 0 {
+                    TileState::White
+                } else {
+                    TileState::Black
+                },
+            )
         }
-        game.white
-            .board
-            .clear_range(bits_needed..(64 * n_blocks_rounded_up));
-        game.black
-            .board
-            .clear_range(bits_needed..(64 * n_blocks_rounded_up));
+
         game
     }
 
@@ -55,7 +53,7 @@ mod test {
         for x in 0..n {
             if x < 1 {
                 game.set_tile(
-                    x,
+                    x + 1,
                     2,
                     if x % 2 == 0 {
                         TileState::White
@@ -65,7 +63,7 @@ mod test {
                 );
             } else {
                 game.set_tile(
-                    x,
+                    x + 1,
                     1,
                     if (x - 1) % 2 == 0 {
                         TileState::White
@@ -79,11 +77,15 @@ mod test {
         game
     }
 
-    fn linear_with_tail(tail_len: usize, n: usize, offset: usize) -> Konane256<32, 8> {
+    fn linear_with_tail(
+        tail_len: usize,
+        n: usize,
+        offset: usize,
+    ) -> Konane256<40, 8, BitArray<5, u64>> {
         let mut game = Konane256::empty();
         for i in 0..tail_len {
             game.set_tile(
-                0,
+                1,
                 5 + i,
                 if i % 2 == 0 {
                     TileState::White
@@ -95,7 +97,7 @@ mod test {
 
         for x in offset..(n - tail_len + offset) {
             game.set_tile(
-                x,
+                x + 1,
                 4,
                 if x % 2 == 0 {
                     TileState::Black
@@ -112,6 +114,7 @@ mod test {
     fn solid_linear_pattern() {
         // source: https://citeseerx.ist.psu.edu/document?repid=rep1&type=pdf&doi=532fc4499a110b79b190e62e23de49c1c51b3f6f
         let slp = |n: u8| gen_solid_linear_pattern(n as usize);
+
         let fuzzy = Nus::new_nimber(Nimber::new(1));
         let zero = Nus::new_integer(0);
 
@@ -166,7 +169,7 @@ mod test {
         assert_eq!(lot1_nus(5), fuzzy);
         assert_eq!(lot1_nus(6), int(6 / 2 - 1));
         assert_eq!(lot1_nus(7), zero);
-        for i in 8..64i64 {
+        for i in 8..63i64 {
             let game = lot1_nus(i as u8);
             assert_eq!(
                 game,

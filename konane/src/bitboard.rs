@@ -34,19 +34,28 @@ impl Direction {
 
 #[derive(Clone, PartialEq, Eq, Hash)]
 #[repr(transparent)]
-pub struct BitBoard256<const W: usize, const H: usize> {
-    pub board: BitArray<4, u64>,
+pub struct BitBoard256<
+    const W: usize,
+    const H: usize,
+    const BLOCK_COUNT: usize = 4,
+    Block: bitarray::BitArrayBlock = u64,
+> {
+    pub board: BitArray<BLOCK_COUNT, Block>,
 }
 
-impl<const W: usize, const H: usize> Default for BitBoard256<W, H> {
+impl<const W: usize, const H: usize, const C: usize, B: bitarray::BitArrayBlock> Default
+    for BitBoard256<W, H, C, B>
+{
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<const W: usize, const H: usize> BitBoard256<W, H> {
+impl<const W: usize, const H: usize, const C: usize, B: bitarray::BitArrayBlock>
+    BitBoard256<W, H, C, B>
+{
     pub fn new() -> Self {
-        assert!(W * H <= 256);
+        assert!(W * H <= B::BLOCK_LENGTH * C);
         assert!(W > 0);
         assert!(H > 0);
         Self {
@@ -83,7 +92,9 @@ impl<const W: usize, const H: usize> BitBoard256<W, H> {
     }
 }
 
-impl<const W: usize, const H: usize> std::fmt::Debug for BitBoard256<W, H> {
+impl<const W: usize, const H: usize, const C: usize, B: bitarray::BitArrayBlock> std::fmt::Debug
+    for BitBoard256<W, H, C, B>
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "BitBoard256<{}, {}> {{", W, H)?;
         for y in 0..H {

@@ -1,16 +1,211 @@
 pub mod bitboard;
 #[cfg(feature = "cgt")]
 pub mod cgt;
-use std::marker::PhantomData;
+use std::{
+    fmt::Debug,
+    marker::PhantomData,
+    ops::{
+        BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl, ShlAssign, Shr,
+        ShrAssign,
+    },
+};
 pub mod invariant;
 use bitarray::BitArray;
-use bitboard::{BitBoard256, Direction};
+use bitboard::Direction;
 use const_direction::ConstDirection;
 
+pub trait BitBoard:
+    BitAnd<Self, Output = Self>
+    + for<'a> BitAnd<&'a Self, Output = Self>
+    + BitOr<Self, Output = Self>
+    + for<'a> BitOr<&'a Self, Output = Self>
+    + BitAndAssign
+    + for<'a> BitAndAssign<&'a Self>
+    + BitOrAssign
+    + BitXor<Self, Output = Self>
+    + for<'a> BitXor<&'a Self, Output = Self>
+    + BitXorAssign
+    + Shl<usize, Output = Self>
+    + ShlAssign<usize>
+    + Shr<usize, Output = Self>
+    + ShrAssign<usize>
+    + Not<Output = Self>
+    + PartialEq
+    + Clone
+    + Eq
+    + std::fmt::Binary
+    + Debug
+where
+    Self: Sized,
+{
+    const BIT_LENGTH: usize;
+
+    fn empty() -> Self;
+    fn all() -> Self;
+    fn one() -> Self;
+
+    fn set(&mut self, idx: usize);
+    fn clear(&mut self, idx: usize);
+    fn get(&self, idx: usize) -> bool;
+    fn first_set(&self) -> Option<usize>;
+    fn first_clear(&self) -> Option<usize>;
+    fn last_set(&self) -> Option<usize>;
+    fn count_set(&self) -> usize;
+    fn count_clear(&self) -> usize;
+    fn iter_set(&self) -> impl Iterator<Item = usize>;
+}
+
+macro_rules! impl_bit_board {
+    ($ty:ident) => {
+        impl BitBoard for $ty {
+            const BIT_LENGTH: usize = std::mem::size_of::<$ty>() * 8;
+
+            #[inline(always)]
+            fn empty() -> Self {
+                0u8.into()
+            }
+
+            #[inline(always)]
+            fn one() -> Self {
+                1u8.into()
+            }
+
+            #[inline(always)]
+            fn all() -> Self {
+                !Self::empty()
+            }
+
+            #[inline(always)]
+            fn set(&mut self, idx: usize) {
+                *self |= Self::one() << idx
+            }
+
+            #[inline(always)]
+            fn get(&self, idx: usize) -> bool {
+                *self & Self::one() << idx != Self::empty()
+            }
+
+            #[inline(always)]
+            fn clear(&mut self, idx: usize) {
+                *self &= !(Self::one() << idx)
+            }
+
+            #[inline(always)]
+            fn first_set(&self) -> Option<usize> {
+                match (*self).trailing_zeros() as usize {
+                    Self::BIT_LENGTH => None,
+                    i => Some(i),
+                }
+            }
+
+            #[inline(always)]
+            fn first_clear(&self) -> Option<usize> {
+                match (*self).trailing_ones() as usize {
+                    Self::BIT_LENGTH => None,
+                    i => Some(i),
+                }
+            }
+
+            #[inline(always)]
+            fn count_set(&self) -> usize {
+                self.count_ones() as usize
+            }
+
+            #[inline(always)]
+            fn count_clear(&self) -> usize {
+                self.count_zeros() as usize
+            }
+
+            #[inline(always)]
+            fn last_set(&self) -> Option<usize> {
+                match (*self).leading_zeros() as usize {
+                    Self::BIT_LENGTH => None,
+                    i => Some(Self::BIT_LENGTH - 1 - i),
+                }
+            }
+
+            fn iter_set(&self) -> impl Iterator<Item = usize> {
+                (0usize..Self::BIT_LENGTH)
+                    .filter(|&index| (Self::one() << index) & *self != Self::empty())
+            }
+        }
+    };
+}
+
+use bnum::types::U256;
+
+impl_bit_board!(u8);
+impl_bit_board!(u16);
+impl_bit_board!(u32);
+impl_bit_board!(u64);
+impl_bit_board!(u128);
+impl_bit_board!(usize);
+impl_bit_board!(U256);
+
+impl<const N: usize> BitBoard for BitArray<N, u64> {
+    const BIT_LENGTH: usize = 64 * N;
+
+    fn empty() -> Self {
+        [0u64; N].into()
+    }
+
+    fn one() -> Self {
+        let mut v = BitArray::empty();
+        v.set(0);
+        v
+    }
+
+    #[inline(always)]
+    fn all() -> Self {
+        !Self::empty()
+    }
+
+    #[inline(always)]
+    fn first_set(&self) -> Option<usize> {
+        BitArray::<N, u64>::first_set(self)
+    }
+
+    #[inline(always)]
+    fn first_clear(&self) -> Option<usize> {
+        BitArray::<N, u64>::first_clear(self)
+    }
+
+    #[inline(always)]
+    fn count_set(&self) -> usize {
+        BitArray::<N, u64>::iter_set(self).count()
+    }
+
+    #[inline(always)]
+    fn count_clear(&self) -> usize {
+        BitArray::<N, u64>::iter_set(self).count()
+    }
+
+    #[inline(always)]
+    fn last_set(&self) -> Option<usize> {
+        self.last_set()
+    }
+
+    fn iter_set(&self) -> impl Iterator<Item = usize> {
+        BitArray::iter_set(&self)
+    }
+
+    fn set(&mut self, idx: usize) {
+        BitArray::set(self, idx);
+    }
+
+    fn get(&self, idx: usize) -> bool {
+        BitArray::get(self, idx)
+    }
+
+    fn clear(&mut self, idx: usize) {
+        BitArray::clear(self, idx);
+    }
+}
+
 #[derive(Clone, Hash, PartialEq, Eq)]
-pub struct Konane256<const W: usize = 16, const H: usize = 16> {
-    pub white: BitBoard256<W, H>,
-    pub black: BitBoard256<W, H>,
+pub struct Konane256<const W: usize = 16, const H: usize = 16, B: BitBoard = BitArray<4, u64>> {
+    pub white: B,
+    pub black: B,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -20,7 +215,7 @@ pub enum TileState {
     Empty,
 }
 
-impl<const W: usize, const H: usize> std::fmt::Debug for Konane256<W, H> {
+impl<const W: usize, const H: usize, B: BitBoard> std::fmt::Debug for Konane256<W, H, B> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Konane256<{}, {}> {{", W, H)?;
         for y in 0..H {
@@ -38,7 +233,7 @@ impl<const W: usize, const H: usize> std::fmt::Debug for Konane256<W, H> {
     }
 }
 
-impl<const W: usize, const H: usize> Konane256<W, H> {
+impl<const W: usize, const H: usize, B: BitBoard> Konane256<W, H, B> {
     /// x => white, o => black, _ => empty
     pub fn must_parse(s: &str) -> Self {
         let mut game = Self::empty();
@@ -63,10 +258,39 @@ impl<const W: usize, const H: usize> Konane256<W, H> {
     }
 
     pub fn empty() -> Self {
+        assert!(W * H <= B::BIT_LENGTH);
         Self {
-            white: BitBoard256::new(),
-            black: BitBoard256::new(),
+            white: B::empty(),
+            black: B::empty(),
         }
+    }
+
+    pub fn border_mask(dir: Direction) -> B {
+        let mut base = B::empty();
+        match dir {
+            Direction::Up => {
+                for i in 0..W {
+                    base.set(i)
+                }
+            }
+            Direction::Down => {
+                for i in W * (H - 1)..W * H {
+                    base.set(i)
+                }
+            }
+            Direction::Right => {
+                for i in 1..=H {
+                    base.set((W - 1) * i)
+                }
+            }
+            Direction::Left => {
+                for i in 0..H {
+                    base.set(W * i)
+                }
+            }
+        }
+
+        base
     }
 
     pub fn small((rows, cols): (usize, usize), tiles: &[TileState]) -> Self {
@@ -119,28 +343,34 @@ impl<const W: usize, const H: usize> Konane256<W, H> {
         board
     }
 
+    pub fn xy_to_idx(x: usize, y: usize) -> usize {
+        y * W + x
+    }
+
     pub fn set_tile(&mut self, x: usize, y: usize, state: TileState) {
         assert!(x < W);
         assert!(y < H);
 
+        let i = Self::xy_to_idx(x, y);
         match state {
             TileState::White => {
-                self.white.set(x, y, true);
-                self.black.set(x, y, false);
+                self.white.set(i);
+                self.black.clear(i);
             }
             TileState::Black => {
-                self.black.set(x, y, true);
-                self.white.set(x, y, false);
+                self.black.set(i);
+                self.white.clear(i);
             }
             TileState::Empty => {
-                self.black.set(x, y, false);
-                self.white.set(x, y, false);
+                self.white.clear(i);
+                self.black.clear(i);
             }
         }
     }
 
     pub fn get_tile(&self, x: usize, y: usize) -> TileState {
-        match (self.black.get(x, y), self.white.get(x, y)) {
+        let i = Self::xy_to_idx(x, y);
+        match (self.black.get(i), self.white.get(i)) {
             (true, true) => panic!("Tile at <{}, {}> is marked for both black and white", x, y),
             (false, false) => TileState::Empty,
             (true, false) => TileState::Black,
@@ -148,29 +378,37 @@ impl<const W: usize, const H: usize> Konane256<W, H> {
         }
     }
 
-    pub fn empty_spaces(&self) -> BitArray<4, u64> {
+    pub fn empty_spaces(&self) -> B {
         // get empty by selecting non-black spaces that don't have a white piece.
-        !self.black.board.clone() ^ &self.white.board
+        // and clear extra bits
+        !(self.black.clone()
+            | &self.white
+            | if W * H < B::BIT_LENGTH {
+                // necessary to avoid overflow panics
+                B::all() << W * H
+            } else {
+                B::empty()
+            })
     }
 
     pub fn move_generator_white<'a, Dir: ConstDirection>(
         &'a self,
         _: Dir,
-    ) -> MoveGenerator<'a, Dir, W, H, true> {
+    ) -> MoveGenerator<'a, Dir, W, H, true, B> {
         MoveGenerator::new(self)
     }
 
     pub fn move_generator_black<'a, Dir: ConstDirection>(
         &'a self,
         _: Dir,
-    ) -> MoveGenerator<'a, Dir, W, H, false> {
+    ) -> MoveGenerator<'a, Dir, W, H, false, B> {
         MoveGenerator::new(self)
     }
 
     pub fn move_generator<'a, const IS_WHITE: bool, Dir: ConstDirection>(
         &'a self,
         _: Dir,
-    ) -> MoveGenerator<'a, Dir, W, H, IS_WHITE> {
+    ) -> MoveGenerator<'a, Dir, W, H, IS_WHITE, B> {
         MoveGenerator::new(self)
     }
 
@@ -224,32 +462,36 @@ pub struct MoveGenerator<
     const W: usize,
     const H: usize,
     const IS_WHITE: bool,
+    B: BitBoard,
 > {
-    game: &'a Konane256<W, H>,
-    moves: BitBoard256<W, H>,
+    game: &'a Konane256<W, H, B>,
+    moves: B,
     hops: usize,
     _dir: PhantomData<Dir>,
 }
 
-impl<'a, Dir: ConstDirection, const W: usize, const H: usize, const IS_WHITE: bool>
-    MoveGenerator<'a, Dir, W, H, IS_WHITE>
+impl<
+        'a,
+        Dir: ConstDirection,
+        const W: usize,
+        const H: usize,
+        const IS_WHITE: bool,
+        B: BitBoard,
+    > MoveGenerator<'a, Dir, W, H, IS_WHITE, B>
 {
     pub const fn direction() -> Direction {
         Dir::VALUE
     }
 
     pub fn is_complete(&self) -> bool {
-        self.moves.board.is_empty()
+        self.moves == B::empty()
     }
 
-    pub fn new(game: &'a Konane256<W, H>) -> Self {
-        let mut moves: BitBoard256<W, H> = BitBoard256::border_mask(Self::direction());
-        moves.board = !moves.board;
-        moves.board &= if IS_WHITE {
-            &game.white.board
-        } else {
-            &game.black.board
-        };
+    pub fn new(game: &'a Konane256<W, H, B>) -> Self {
+        let mut moves: B = Konane256::<W, H, B>::border_mask(Self::direction());
+        moves = !moves;
+        moves &= if IS_WHITE { &game.white } else { &game.black };
+
         Self {
             game,
             moves,
@@ -261,73 +503,66 @@ impl<'a, Dir: ConstDirection, const W: usize, const H: usize, const IS_WHITE: bo
     /// "move" the pieces by using a bit shift on the board
     fn shift(&mut self) {
         match Self::direction() {
-            Direction::Right => self.moves.board <<= 1,
-            Direction::Left => self.moves.board >>= 1,
-            Direction::Up => self.moves.board >>= W,
-            Direction::Down => self.moves.board <<= W,
+            Direction::Right => self.moves <<= 1,
+            Direction::Left => self.moves >>= 1,
+            Direction::Up => self.moves >>= W,
+            Direction::Down => self.moves <<= W,
         }
     }
 
     pub fn advance(&mut self) {
-        if self.moves.board.is_empty() {
+        if self.moves == B::empty() {
             return;
         }
 
         // 1. verify that there's a capture-able adjacent piece
         self.shift();
         if IS_WHITE {
-            self.moves.board &= &self.game.black.board;
+            self.moves &= &self.game.black;
         } else {
-            self.moves.board &= &self.game.white.board;
+            self.moves &= &self.game.white;
         }
 
         // 2. verify there's an empty space after the piece to be jumped
         self.shift();
-        self.game.empty_spaces();
-        self.moves.board &= self.game.empty_spaces();
+        self.moves &= self.game.empty_spaces();
 
         self.hops += 1;
     }
 
-    pub fn move_iter(&'a self) -> impl Iterator<Item = Move<'a, Dir, W, H, IS_WHITE>> {
-        self.moves.board.iter_set().map(|index| {
-            assert!(index < 256);
-            let index_u8 = index as u8;
-            Move {
-                move_to: index_u8,
-                hops: self.hops as u8,
-                _generator: PhantomData,
-            }
+    pub fn move_iter(&'a self) -> impl Iterator<Item = Move<W, H, IS_WHITE, B>> + 'a {
+        self.moves.iter_set().map(|index| Move {
+            from: (index as isize
+                + 2 * (Dir::VALUE.x() + Dir::VALUE.y() * W as isize) * self.hops as isize)
+                as u16,
+            to: index as u16,
+            _game: PhantomData,
         })
     }
 }
 
-// TODO: remove usel lifetime
 #[derive(Debug, Clone, Copy)]
-pub struct Move<'a, Dir: ConstDirection, const W: usize, const H: usize, const IS_WHITE: bool> {
-    move_to: u8,
-    hops: u8,
-    _generator: PhantomData<MoveGenerator<'a, Dir, W, H, IS_WHITE>>,
+pub struct Move<const W: usize, const H: usize, const IS_WHITE: bool, B: BitBoard> {
+    from: u16,
+    to: u16,
+    _game: PhantomData<Konane256<W, H, B>>,
 }
 
-impl<'a, Dir: ConstDirection, const W: usize, const H: usize, const IS_WHITE: bool>
-    Move<'a, Dir, W, H, IS_WHITE>
-{
-    pub fn apply(&self, mut game: Konane256<W, H>) -> Konane256<W, H> {
-        let step = Dir::VALUE.x() + Dir::VALUE.y() * W as isize;
-        let itarget = self.move_to as isize;
-        let original_pos = itarget + 2 * step * self.hops as isize;
-
-        let (current_board, opponent) = if IS_WHITE {
-            (&mut game.white.board, &mut game.black.board)
+impl<const W: usize, const H: usize, const IS_WHITE: bool, B: BitBoard> Move<W, H, IS_WHITE, B> {
+    pub fn apply(&self, mut game: Konane256<W, H, B>) -> Konane256<W, H, B> {
+        let start = self.from.min(self.to);
+        let end = self.from.max(self.to);
+        let step = if end - start >= W as u16 { W as u16 } else { 1 };
+        let mut i = start;
+        while i <= end {
+            game.black.clear(i as usize);
+            game.white.clear(i as usize);
+            i += step;
+        }
+        if IS_WHITE {
+            game.white.set(self.to as usize)
         } else {
-            (&mut game.black.board, &mut game.white.board)
-        };
-        current_board.set(itarget as usize);
-        current_board.clear(original_pos as usize);
-
-        for i in 0..self.hops as isize {
-            opponent.clear((itarget + step + 2 * step * i) as usize);
+            game.black.set(self.to as usize)
         }
 
         game
@@ -391,6 +626,22 @@ mod test {
     }
 
     #[test]
+    pub fn checkerboard_11x11() {
+        let board: Konane256<11, 11, u128> = Konane256::checkerboard();
+        for x in 0..11 {
+            for y in 0..11 {
+                assert_ne!(board.get_tile(x, y), TileState::Empty);
+                if x > 0 {
+                    assert_ne!(board.get_tile(x, y), board.get_tile(x - 1, y));
+                }
+                if y > 1 {
+                    assert_ne!(board.get_tile(x, y), board.get_tile(x, y - 1));
+                }
+            }
+        }
+    }
+
+    #[test]
     pub fn move_near_block_boundary() {
         let board: Konane256<256, 1> = Konane256::must_parse(
             r#"_oxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxoxox"#,
@@ -427,10 +678,15 @@ mod test {
     #[test]
     pub fn moveset_on_full_board_is_empty_16x16() {
         let board: Konane256<16, 16> = Konane256::checkerboard();
-        dbg!(board.empty_spaces());
-        dbg!(&board.white);
-        dbg!(&board.black);
 
+        assert_eq!(board.all_moves_black(), vec![]);
+        assert_eq!(board.all_moves_white(), vec![]);
+    }
+
+    #[test]
+    pub fn moveset_on_full_board_is_empty_11x11() {
+        let board = Konane256::<11, 11, u128>::checkerboard();
+        dbg!(&board);
         assert_eq!(board.all_moves_black(), vec![]);
         assert_eq!(board.all_moves_white(), vec![]);
     }
@@ -438,6 +694,10 @@ mod test {
     #[test]
     pub fn moveset_white_right_jump() {
         let board: Konane256 = Konane256::must_parse("xo");
+        assert_eq!(board.all_moves_white(), vec![Konane256::must_parse("__x")]);
+        assert_eq!(board.all_moves_black(), vec![]);
+
+        let board: Konane256<4, 4, u32> = Konane256::must_parse("xo");
         assert_eq!(board.all_moves_white(), vec![Konane256::must_parse("__x")]);
         assert_eq!(board.all_moves_black(), vec![]);
     }

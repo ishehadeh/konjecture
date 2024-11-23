@@ -5,7 +5,7 @@ pub mod iter;
 
 use std::ops::{self, BitXorAssign};
 
-use block::BitArrayBlock;
+pub use block::BitArrayBlock;
 use iter::BitArrayIter;
 
 #[derive(Clone, PartialEq, Eq, Hash, PartialOrd)]
@@ -241,6 +241,17 @@ impl<const BLOCK_COUNT: usize, Block: BitArrayBlock> BitArray<BLOCK_COUNT, Block
 impl<const BLOCK_COUNT: usize, Block: BitArrayBlock> Default for BitArray<BLOCK_COUNT, Block> {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+impl<const BLOCK_COUNT: usize, Block: BitArrayBlock> std::fmt::Binary
+    for BitArray<BLOCK_COUNT, Block>
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for block in self.blocks {
+            write!(f, "{:0pad$b}", block, pad = Block::BLOCK_LENGTH)?;
+        }
+        Ok(())
     }
 }
 
@@ -489,6 +500,13 @@ impl<const N: usize, B: BitArrayBlock> ops::Not for BitArray<N, B> {
         self
     }
 }
+
+impl Copy for BitArray<1, u64> {}
+impl Copy for BitArray<2, u64> {}
+impl Copy for BitArray<3, u64> {}
+impl Copy for BitArray<4, u64> {}
+impl Copy for BitArray<5, u64> {}
+impl Copy for BitArray<8, u64> {}
 
 #[cfg(test)]
 mod test {
