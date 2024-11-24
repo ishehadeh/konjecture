@@ -4,10 +4,18 @@ use crate::{
     const_direction::{Down, Left, Right, Up},
     BitBoard, Konane256,
 };
+
 use cgt::short::partizan::{partizan_game::PartizanGame, transposition_table::TranspositionTable};
+// Invariant Submodules
 pub use nearest_border::*;
 mod nearest_border;
 
+#[cfg(feature = "cgt")]
+mod cgt_value;
+#[cfg(feature = "cgt")]
+pub use cgt_value::*;
+
+/// A game which can be split into seperate structures representing each player individually.
 pub trait TwoPlayerGame {
     type B;
 
@@ -153,37 +161,6 @@ impl<const W: usize, const H: usize, B: BitBoard> SinglePlayerInvariant<Konane25
     }
 }
 
-#[cfg(feature = "cgt")]
-pub struct CanonicalFormNumber<'a, G: TwoPlayerGame + PartizanGame, TT>
-where
-    TT: TranspositionTable<G> + Sync,
-{
-    tt: &'a TT,
-    g: PhantomData<G>,
-}
-impl<'a, G: TwoPlayerGame + PartizanGame, TT> CanonicalFormNumber<'a, G, TT>
-where
-    TT: TranspositionTable<G> + Sync,
-{
-    pub fn new(tt: &'a TT) -> Self {
-        Self { tt, g: PhantomData }
-    }
-}
-
-impl<'a, G: TwoPlayerGame + PartizanGame, TT> Invariant<G> for CanonicalFormNumber<'a, G, TT>
-where
-    TT: TranspositionTable<G> + Sync,
-{
-    fn compute(&self, game: G) -> f64 {
-        let canonical_form = game.canonical_form(self.tt);
-        if let Some(rat) = canonical_form.to_number() {
-            (rat.numerator() as f64) / 2.0f64.powi(rat.denominator_exponent() as i32)
-        } else {
-            f64::NAN
-        }
-    }
-}
-
 pub struct MoveCount<const W: usize, const H: usize, B: BitBoard, const IS_WHITE: bool>(
     PhantomData<B>,
 );
@@ -239,6 +216,7 @@ impl<const W: usize, const H: usize, B: BitBoard> CaptureCount<W, H, B, true> {
         Self(PhantomData)
     }
 }
+
 impl<const W: usize, const H: usize, B: BitBoard, const IS_WHITE: bool>
     Invariant<Konane256<W, H, B>> for CaptureCount<W, H, B, IS_WHITE>
 {
