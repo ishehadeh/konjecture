@@ -4,3 +4,4 @@
 *.duckdb.wal
 .venv/
 .ipynb_checkpoints/
+sage/
