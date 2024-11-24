@@ -209,7 +209,7 @@ impl<const W: usize, const H: usize, B: BitBoard, const IS_WHITE: bool>
         let mut r = game.move_generator::<IS_WHITE, _>(Right);
         let mut u = game.move_generator::<IS_WHITE, _>(Up);
         let mut d = game.move_generator::<IS_WHITE, _>(Down);
-        while !l.is_complete() && !r.is_complete() && !u.is_complete() && !d.is_complete() {
+        while !l.is_complete() || !r.is_complete() || !u.is_complete() || !d.is_complete() {
             l.advance();
             r.advance();
             u.advance();
@@ -250,7 +250,7 @@ impl<const W: usize, const H: usize, B: BitBoard, const IS_WHITE: bool>
 
         // game where we run all given moves for the current player
         let mut all_captured = game.clone();
-        while !l.is_complete() && !r.is_complete() && !u.is_complete() && !d.is_complete() {
+        while !l.is_complete() || !r.is_complete() || !u.is_complete() || !d.is_complete() {
             l.advance();
             r.advance();
             u.advance();
@@ -338,5 +338,17 @@ mod test {
         let r = CaptureCount::right().compute(game.clone());
         assert_eq!(r, 1f64);
         assert_eq!(l, 1f64);
+
+        let game = Konane256::<16, 16>::must_parse(
+            r#"
+            __xo__
+            ___xo_
+        "#,
+        );
+
+        let l = CaptureCount::left().compute(game.clone());
+        let r = CaptureCount::right().compute(game.clone());
+        assert_eq!(r, 2f64);
+        assert_eq!(l, 2f64);
     }
 }

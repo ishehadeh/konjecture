@@ -11,12 +11,14 @@ duckdb = { version = "=1.1.1", optional = true, features = ["bundled"] }
 itertools = "*"
 thiserror = "*"
 bnum = "0.12.0"
+polars = { version = "*", optional = true , features = ["polars-io", "parquet"]}
 
 [features]
 cgt = ["dep:cgt"]
 rand = ["dep:rand"]
 rayon = ["cgt/rayon"]
 duckdb = ["dep:duckdb"]
+polars = ["dep:polars"]
 
 [[bin]]
 name = "konane2canonical"
@@ -29,6 +31,11 @@ required-features = ["rand", "cgt"]
 [[bin]]
 name = "duckdb"
 required-features = ["duckdb", "cgt"]
+
+
+[[bin]]
+name = "polars"
+required-features = ["polars", "cgt"]
 
 
 [dev-dependencies]
