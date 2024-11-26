@@ -2,7 +2,6 @@
 
 // render a Konane board
 #let konane(str, tile-size: 1em, cell-names: true) = {
-  let alpha = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
   let str_rows = str.trim().split("\n").map(v => v.trim())
   let width = calc.max(..str_rows.map(r => r.len()))
   let height = str_rows.len()
@@ -13,14 +12,14 @@
     inset: 3pt,
     ..if cell-names { ([],) } else { () },
     ..if cell-names {
-      range(0, width).map(i => [#{i + 1}])
+      range(0, width).map(i => [#i])
     } else {
       ()
     },
     ..str_rows.enumerate().map(
       ((row_i, row)) => (
         ..if cell-names {
-          (alpha.at(row_i),)
+          ([#row_i],)
         } else {
           ()
         },

@@ -8,7 +8,7 @@ There are two players, one playing with black pieces, and the other white pieces
 
 == Konane Starting Phase
 
-A game begins with black removing one of their corner pieces or one of their center pieces (@thompsonTeachingNeuralNetwork2005). For example, in @eg-start the game begins with black choosing one of the pieces outlined in red to remove. Once black removes a piece, white then chooses an adjacent piece to remove. For example, if black begins by removing D4, moving the position in @eg-start-t2, white can now remove any of the highlighted pieces. 
+A game begins with black removing one of their corner pieces or one of their center pieces (@thompsonTeachingNeuralNetwork2005). For example, in @eg-start the game begins with black choosing one of the pieces outlined in red to remove. Once black removes a piece, white then chooses an adjacent piece to remove. For example, if black begins by removing $(3,3)$, moving the position in @eg-start-t2, white can now remove any of the highlighted pieces. 
 
 #grid(columns: 3, gutter: 3em,
   [
@@ -57,7 +57,7 @@ Once white removes a piece, normal play begins.
 
 On each player's turn, they must capture at least one of their opponent's pieces. The first player who is unable to capture any pieces loses.
 
-A player may capture a piece of the opposing color is captured by _jumping_ over it using one of their pieces into an empty space. @eg-capture shows white capturing a black piece by moving from A3 to A1.
+A player may capture a piece of the opposing color is captured by _jumping_ over it using one of their pieces into an empty space. @eg-capture shows white capturing a black piece by moving from $(0, 2)$ to $(0, 0)$.
 
 #figure(caption: "Capture")[
   #grid(column-gutter: 2em, row-gutter: 1em, columns: 2, rows: 2,
