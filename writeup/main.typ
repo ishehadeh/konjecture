@@ -31,3 +31,4 @@
 )
 
 #include "partials/01-konane.typ"
+#include "partials/02-conjecturing.typ"
