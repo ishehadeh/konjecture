@@ -10,7 +10,7 @@ In our case, an object is a single Konane position, and invariants include thing
   #table(
     columns: 4,
     rows: 3, 
-    table.header([*Games*], [*\# Black* ($I_1$)], [*\# White* ($I_2$)], [*\# Moves* ($I_3$)]),
+    table.header([*Games*], [*\#Black* ($I_1$)], [*\#White* ($I_2$)], [*\#Moves* ($I_3$)]),
     
     konane("xox\n_", cell-names: false),
     $2$, $1$, $0$, 
@@ -21,7 +21,18 @@ In our case, an object is a single Konane position, and invariants include thing
     konane("ox\n_xo", cell-names: false),
     $2$, $2$, $2$, 
   )
-]
+]<eg-conjecturing-data>
 
 We choose a single invariant to place on the left hand side of the inequality, and which operators to use.
+For example, given the data in @eg-conjecturing-data, we could instruct _Conjecturing_ to use $I_2$ on the left hand side of $<=$, and create expressions using the operators $A + B, A * B, A + 1, sqrt(A), max(A, B)$. A few of the possible results are shown in @eg-conjecturing-output.
 
+#figure(caption: "Conjecturing Output")[
+  #align(center + horizon,
+  $
+    I_2 &<= max(I_1, I_2)\
+    I_2 &<= I_1 + I_2\
+    I_2 &<= I_1 + 1\
+    I_2 &<= I_1 * I_2 + 1 +1
+
+  $)
+]<eg-conjecturing-output>
