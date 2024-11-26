@@ -249,36 +249,6 @@ impl<const W: usize, const H: usize, B: BitBoard, const IS_WHITE: bool>
     }
 }
 
-#[cfg(feature = "cgt")]
-pub struct CanonicalFormNimber<'a, G: TwoPlayerGame + PartizanGame, TT>
-where
-    TT: TranspositionTable<G> + Sync,
-{
-    tt: &'a TT,
-    g: PhantomData<G>,
-}
-impl<'a, G: TwoPlayerGame + PartizanGame, TT> CanonicalFormNimber<'a, G, TT>
-where
-    TT: TranspositionTable<G> + Sync,
-{
-    pub fn new(tt: &'a TT) -> Self {
-        Self { tt, g: PhantomData }
-    }
-}
-
-impl<'a, G: TwoPlayerGame + PartizanGame, TT> Invariant<G> for CanonicalFormNimber<'a, G, TT>
-where
-    TT: TranspositionTable<G> + Sync,
-{
-    fn compute(&self, game: G) -> f64 {
-        let canonical_form = game.canonical_form(self.tt);
-        if let Some(nimber) = canonical_form.to_nus().map(|n| n.nimber().value()) {
-            nimber as f64
-        } else {
-            0.0
-        }
-    }
-}
 #[cfg(test)]
 mod test {
     use crate::{
@@ -297,8 +267,8 @@ mod test {
         "#,
         );
 
-        let w = ImpartialInvariant::new(PieceHeight).compute(game.clone());
-        let h = ImpartialInvariant::new(PieceWidth).compute(game);
+        let h = ImpartialInvariant::new(PieceHeight).compute(game.clone());
+        let w = ImpartialInvariant::new(PieceWidth).compute(game);
         assert_eq!(h, 2f64);
         assert_eq!(w, 4f64);
     }

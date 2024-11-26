@@ -1,4 +1,10 @@
-use bitarray::BitArray;
+use std::{
+    fmt::Debug,
+    ops::{
+        BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl, ShlAssign, Shr,
+        ShrAssign,
+    },
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Direction {
@@ -32,201 +38,159 @@ impl Direction {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
-#[repr(transparent)]
-pub struct BitBoard256<
-    const W: usize,
-    const H: usize,
-    const BLOCK_COUNT: usize = 4,
-    Block: bitarray::BitArrayBlock = u64,
-> {
-    pub board: BitArray<BLOCK_COUNT, Block>,
+pub trait BitBoard:
+    BitAnd<Self, Output = Self>
+    + for<'a> BitAnd<&'a Self, Output = Self>
+    + BitOr<Self, Output = Self>
+    + for<'a> BitOr<&'a Self, Output = Self>
+    + BitAndAssign
+    + for<'a> BitAndAssign<&'a Self>
+    + BitOrAssign
+    + BitXor<Self, Output = Self>
+    + for<'a> BitXor<&'a Self, Output = Self>
+    + BitXorAssign
+    + Shl<usize, Output = Self>
+    + ShlAssign<usize>
+    + Shr<usize, Output = Self>
+    + ShrAssign<usize>
+    + Not<Output = Self>
+    + PartialEq
+    + Clone
+    + Eq
+    + std::fmt::Binary
+    + Debug
+where
+    Self: Sized,
+{
+    type Iter<'a>: Iterator<Item = usize>
+    where
+        Self: 'a;
+    const BIT_LENGTH: usize;
+
+    fn empty() -> Self;
+    fn all() -> Self;
+    fn one() -> Self;
+
+    fn set(&mut self, idx: usize);
+    fn clear(&mut self, idx: usize);
+    fn get(&self, idx: usize) -> bool;
+    fn first_set(&self) -> Option<usize>;
+    fn first_clear(&self) -> Option<usize>;
+    fn last_set(&self) -> Option<usize>;
+    fn count_set(&self) -> usize;
+    fn count_clear(&self) -> usize;
+    fn iter_set<'a>(&'a self) -> Self::Iter<'a>;
 }
 
-impl<const W: usize, const H: usize, const C: usize, B: bitarray::BitArrayBlock> Default
-    for BitBoard256<W, H, C, B>
-{
-    fn default() -> Self {
-        Self::new()
+pub struct BitIter<T: bitarray::BitArrayBlock> {
+    index: usize,
+    value: T,
+}
+
+impl<T: bitarray::BitArrayBlock> BitIter<T> {
+    pub fn new(value: T) -> BitIter<T> {
+        BitIter {
+            index: value.first_set().unwrap_or(T::BLOCK_LENGTH),
+            value,
+        }
     }
 }
 
-impl<const W: usize, const H: usize, const C: usize, B: bitarray::BitArrayBlock>
-    BitBoard256<W, H, C, B>
-{
-    pub fn new() -> Self {
-        assert!(W * H <= B::BLOCK_LENGTH * C);
-        assert!(W > 0);
-        assert!(H > 0);
-        Self {
-            board: BitArray::new(),
-        }
-    }
+impl<T: bitarray::BitArrayBlock> Iterator for BitIter<T> {
+    type Item = usize;
 
-    pub fn border_mask(dir: Direction) -> Self {
-        let mut base = Self::new();
-        match dir {
-            Direction::Up => base.board.set_range(0..W),
-            Direction::Down => base.board.set_range(W * (H - 1)..W * H),
-            Direction::Right => base.board.set_range_step((W - 1)..W * H, W),
-            Direction::Left => base.board.set_range_step(0..W * H, W),
-        }
-
-        base
-    }
-
-    pub fn get(&self, x: usize, y: usize) -> bool {
-        assert!(x < W);
-        assert!(y < H);
-        self.board.get(x + y * W)
-    }
-
-    pub fn set(&mut self, x: usize, y: usize, value: bool) {
-        assert!(x < W);
-        assert!(y < H);
-        if value {
-            self.board.set(x + y * W)
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index == T::BLOCK_LENGTH {
+            None
         } else {
-            self.board.clear(x + y * W)
+            self.value.clear(self.index);
+            let index = self.index;
+            self.index = self.value.first_set().unwrap_or(T::BLOCK_LENGTH);
+            Some(index)
         }
     }
 }
 
-impl<const W: usize, const H: usize, const C: usize, B: bitarray::BitArrayBlock> std::fmt::Debug
-    for BitBoard256<W, H, C, B>
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "BitBoard256<{}, {}> {{", W, H)?;
-        for y in 0..H {
-            write!(f, "   ")?;
-            for x in 0..W {
-                if self.get(x, y) {
-                    write!(f, " 1")?;
-                } else {
-                    write!(f, " 0")?;
+macro_rules! impl_bit_board {
+    ($ty:ident) => {
+        impl BitBoard for $ty {
+            const BIT_LENGTH: usize = std::mem::size_of::<$ty>() * 8;
+            type Iter<'a> = BitIter<$ty>;
+
+            #[inline(always)]
+            fn empty() -> Self {
+                0u8.into()
+            }
+
+            #[inline(always)]
+            fn one() -> Self {
+                1u8.into()
+            }
+
+            #[inline(always)]
+            fn all() -> Self {
+                !Self::empty()
+            }
+
+            #[inline(always)]
+            fn set(&mut self, idx: usize) {
+                *self |= Self::one() << idx
+            }
+
+            #[inline(always)]
+            fn get(&self, idx: usize) -> bool {
+                *self & Self::one() << idx != Self::empty()
+            }
+
+            #[inline(always)]
+            fn clear(&mut self, idx: usize) {
+                *self &= !(Self::one() << idx)
+            }
+
+            #[inline(always)]
+            fn first_set(&self) -> Option<usize> {
+                match (*self).trailing_zeros() as usize {
+                    Self::BIT_LENGTH => None,
+                    i => Some(i),
                 }
             }
-            writeln!(f, "")?;
+
+            #[inline(always)]
+            fn first_clear(&self) -> Option<usize> {
+                match (*self).trailing_ones() as usize {
+                    Self::BIT_LENGTH => None,
+                    i => Some(i),
+                }
+            }
+
+            #[inline(always)]
+            fn count_set(&self) -> usize {
+                self.count_ones() as usize
+            }
+
+            #[inline(always)]
+            fn count_clear(&self) -> usize {
+                self.count_zeros() as usize
+            }
+
+            #[inline(always)]
+            fn last_set(&self) -> Option<usize> {
+                match (*self).leading_zeros() as usize {
+                    Self::BIT_LENGTH => None,
+                    i => Some(Self::BIT_LENGTH - 1 - i),
+                }
+            }
+
+            fn iter_set(&self) -> Self::Iter<'_> {
+                BitIter::new(*self)
+            }
         }
-        writeln!(f, "}}")
-    }
+    };
 }
 
-#[cfg(test)]
-mod test {
-    use super::BitBoard256;
-
-    #[test]
-    pub fn set_get_clear_on_square_small() {
-        let mut board = BitBoard256::<8, 8>::new();
-        board.set(5, 2, true);
-        assert!(board.board.get(8 * 2 + 5));
-        assert!(board.get(5, 2));
-
-        board.set(1, 4, true);
-        assert!(board.board.get(8 * 4 + 1));
-        assert!(board.get(1, 4));
-
-        board.set(0, 2, true);
-        assert!(board.board.get(8 * 2 + 0));
-        assert!(board.get(0, 2));
-
-        board.set(0, 0, true);
-        assert!(board.board.get(0));
-        assert!(board.get(0, 0));
-
-        board.set(7, 7, true);
-        assert!(board.board.get(8 * 8 - 1));
-        assert!(board.get(7, 7));
-
-        board.set(5, 2, false);
-        board.set(0, 2, false);
-        board.set(0, 0, false);
-        board.set(7, 7, false);
-        board.set(1, 4, false);
-        assert!(board.board.is_empty());
-    }
-
-    #[test]
-    pub fn set_get_clear_on_small_rectangle() {
-        let mut board = BitBoard256::<3, 8>::new();
-        board.set(1, 5, true);
-        assert!(board.board.get(3 * 5 + 1));
-        assert!(board.get(1, 5));
-
-        board.set(0, 2, true);
-        assert!(board.board.get(3 * 2 + 0));
-        assert!(board.get(0, 2));
-
-        board.set(0, 0, true);
-        assert!(board.board.get(0));
-        assert!(board.get(0, 0));
-
-        board.set(2, 7, true);
-        assert!(board.board.get(3 * 8 - 1));
-        assert!(board.get(2, 7));
-
-        board.set(1, 5, false);
-        board.set(0, 2, false);
-        board.set(0, 0, false);
-        board.set(2, 7, false);
-        assert!(board.board.is_empty());
-    }
-
-    #[test]
-    pub fn set_get_clear_on_square_full() {
-        let mut board = BitBoard256::<8, 8>::new();
-        board.set(5, 2, true);
-        assert!(board.board.get(8 * 2 + 5));
-        assert!(board.get(5, 2));
-
-        board.set(1, 4, true);
-        assert!(board.board.get(8 * 4 + 1));
-        assert!(board.get(1, 4));
-
-        board.set(0, 2, true);
-        assert!(board.board.get(8 * 2 + 0));
-        assert!(board.get(0, 2));
-
-        board.set(0, 0, true);
-        assert!(board.board.get(0));
-        assert!(board.get(0, 0));
-
-        board.set(7, 7, true);
-        assert!(board.board.get(8 * 8 - 1));
-        assert!(board.get(7, 7));
-
-        board.set(5, 2, false);
-        board.set(1, 4, false);
-        board.set(0, 2, false);
-        board.set(0, 0, false);
-        board.set(7, 7, false);
-        assert!(board.board.is_empty());
-    }
-
-    #[test]
-    pub fn set_get_clear_on_full_rectangle() {
-        let mut board = BitBoard256::<64, 4>::new();
-        board.set(50, 3, true);
-        assert!(board.board.get(64 * 3 + 50));
-        assert!(board.get(50, 3));
-
-        board.set(0, 2, true);
-        assert!(board.board.get(64 * 2 + 0));
-        assert!(board.get(0, 2));
-
-        board.set(0, 0, true);
-        assert!(board.board.get(0));
-        assert!(board.get(0, 0));
-
-        board.set(63, 3, true);
-        assert!(board.board.get(64 * 4 - 1));
-        assert!(board.get(63, 3));
-
-        board.set(50, 3, false);
-        board.set(0, 2, false);
-        board.set(0, 0, false);
-        board.set(63, 3, false);
-        assert!(board.board.is_empty());
-    }
-}
+impl_bit_board!(u8);
+impl_bit_board!(u16);
+impl_bit_board!(u32);
+impl_bit_board!(u64);
+impl_bit_board!(u128);
+impl_bit_board!(usize);

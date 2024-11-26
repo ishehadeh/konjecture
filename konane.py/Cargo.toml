@@ -9,5 +9,7 @@ name = "konane"
 crate-type = ["cdylib"]
 
 [dependencies]
-pyo3 = "0.22.0"
+pyo3 = {version = "0.22.0", features = ["multiple-pymethods"]}
 konane = { path = "../konane", features = ["cgt"] }
+bitarray = { path = "../bitarray" }
+cgt = { path = "../../cgt-tools" }

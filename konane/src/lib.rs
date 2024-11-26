@@ -1,149 +1,18 @@
 pub mod bitboard;
 #[cfg(feature = "cgt")]
 pub mod cgt;
-use std::{
-    fmt::Debug,
-    marker::PhantomData,
-    ops::{
-        BitAnd, BitAndAssign, BitOr, BitOrAssign, BitXor, BitXorAssign, Not, Shl, ShlAssign, Shr,
-        ShrAssign,
-    },
-};
+use std::{fmt::Debug, marker::PhantomData, str::FromStr};
+mod konane_dyn_dim;
+pub use konane_dyn_dim::*;
 pub mod invariant;
-use bitarray::BitArray;
-use bitboard::Direction;
+use bitarray::{iter::BitArrayIter, BitArray};
+use bitboard::{BitBoard, Direction};
 use const_direction::ConstDirection;
-
-pub trait BitBoard:
-    BitAnd<Self, Output = Self>
-    + for<'a> BitAnd<&'a Self, Output = Self>
-    + BitOr<Self, Output = Self>
-    + for<'a> BitOr<&'a Self, Output = Self>
-    + BitAndAssign
-    + for<'a> BitAndAssign<&'a Self>
-    + BitOrAssign
-    + BitXor<Self, Output = Self>
-    + for<'a> BitXor<&'a Self, Output = Self>
-    + BitXorAssign
-    + Shl<usize, Output = Self>
-    + ShlAssign<usize>
-    + Shr<usize, Output = Self>
-    + ShrAssign<usize>
-    + Not<Output = Self>
-    + PartialEq
-    + Clone
-    + Eq
-    + std::fmt::Binary
-    + Debug
-where
-    Self: Sized,
-{
-    const BIT_LENGTH: usize;
-
-    fn empty() -> Self;
-    fn all() -> Self;
-    fn one() -> Self;
-
-    fn set(&mut self, idx: usize);
-    fn clear(&mut self, idx: usize);
-    fn get(&self, idx: usize) -> bool;
-    fn first_set(&self) -> Option<usize>;
-    fn first_clear(&self) -> Option<usize>;
-    fn last_set(&self) -> Option<usize>;
-    fn count_set(&self) -> usize;
-    fn count_clear(&self) -> usize;
-    fn iter_set(&self) -> impl Iterator<Item = usize>;
-}
-
-macro_rules! impl_bit_board {
-    ($ty:ident) => {
-        impl BitBoard for $ty {
-            const BIT_LENGTH: usize = std::mem::size_of::<$ty>() * 8;
-
-            #[inline(always)]
-            fn empty() -> Self {
-                0u8.into()
-            }
-
-            #[inline(always)]
-            fn one() -> Self {
-                1u8.into()
-            }
-
-            #[inline(always)]
-            fn all() -> Self {
-                !Self::empty()
-            }
-
-            #[inline(always)]
-            fn set(&mut self, idx: usize) {
-                *self |= Self::one() << idx
-            }
-
-            #[inline(always)]
-            fn get(&self, idx: usize) -> bool {
-                *self & Self::one() << idx != Self::empty()
-            }
-
-            #[inline(always)]
-            fn clear(&mut self, idx: usize) {
-                *self &= !(Self::one() << idx)
-            }
-
-            #[inline(always)]
-            fn first_set(&self) -> Option<usize> {
-                match (*self).trailing_zeros() as usize {
-                    Self::BIT_LENGTH => None,
-                    i => Some(i),
-                }
-            }
-
-            #[inline(always)]
-            fn first_clear(&self) -> Option<usize> {
-                match (*self).trailing_ones() as usize {
-                    Self::BIT_LENGTH => None,
-                    i => Some(i),
-                }
-            }
-
-            #[inline(always)]
-            fn count_set(&self) -> usize {
-                self.count_ones() as usize
-            }
-
-            #[inline(always)]
-            fn count_clear(&self) -> usize {
-                self.count_zeros() as usize
-            }
-
-            #[inline(always)]
-            fn last_set(&self) -> Option<usize> {
-                match (*self).leading_zeros() as usize {
-                    Self::BIT_LENGTH => None,
-                    i => Some(Self::BIT_LENGTH - 1 - i),
-                }
-            }
-
-            fn iter_set(&self) -> impl Iterator<Item = usize> {
-                (0usize..Self::BIT_LENGTH)
-                    .filter(|&index| (Self::one() << index) & *self != Self::empty())
-            }
-        }
-    };
-}
-
-use bnum::types::U256;
-
-impl_bit_board!(u8);
-impl_bit_board!(u16);
-impl_bit_board!(u32);
-impl_bit_board!(u64);
-impl_bit_board!(u128);
-impl_bit_board!(usize);
-impl_bit_board!(U256);
+use thiserror::Error;
 
 impl<const N: usize> BitBoard for BitArray<N, u64> {
     const BIT_LENGTH: usize = 64 * N;
+    type Iter<'a> = BitArrayIter<'a, true, false, N, u64>;
 
     fn empty() -> Self {
         [0u64; N].into()
@@ -185,7 +54,7 @@ impl<const N: usize> BitBoard for BitArray<N, u64> {
         self.last_set()
     }
 
-    fn iter_set(&self) -> impl Iterator<Item = usize> {
+    fn iter_set(&self) -> Self::Iter<'_> {
         BitArray::iter_set(&self)
     }
 
@@ -233,9 +102,14 @@ impl<const W: usize, const H: usize, B: BitBoard> std::fmt::Debug for Konane256<
     }
 }
 
-impl<const W: usize, const H: usize, B: BitBoard> Konane256<W, H, B> {
-    /// x => white, o => black, _ => empty
-    pub fn must_parse(s: &str) -> Self {
+#[derive(Error, Debug, Clone)]
+pub enum KonaneParseError {
+    #[error("expected one of 'x', 'o', or '_', got '{c}'")]
+    UnexpectedCharacter { c: char },
+}
+
+impl<const W: usize, const H: usize, B: BitBoard> FromStr for Konane256<W, H, B> {
+    fn from_str(s: &str) -> Result<Self, KonaneParseError> {
         let mut game = Self::empty();
         for (y, row_txt) in s
             .trim()
@@ -249,12 +123,21 @@ impl<const W: usize, const H: usize, B: BitBoard> Konane256<W, H, B> {
                     'x' => game.set_tile(x, y, TileState::White),
                     'o' => game.set_tile(x, y, TileState::Black),
                     '_' => game.set_tile(x, y, TileState::Empty),
-                    _ => panic!("invalid tile character: {:?}", c),
+                    c => return Err(KonaneParseError::UnexpectedCharacter { c }),
                 }
             }
         }
 
-        game
+        Ok(game)
+    }
+
+    type Err = KonaneParseError;
+}
+
+impl<const W: usize, const H: usize, B: BitBoard> Konane256<W, H, B> {
+    /// x => white, o => black, _ => empty
+    pub fn must_parse(s: &str) -> Self {
+        Self::from_str(s).expect("failed to parse game")
     }
 
     pub fn empty() -> Self {

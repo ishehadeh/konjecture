@@ -2,7 +2,7 @@ use std::hash::Hash;
 
 use cgt::short::partizan::partizan_game::PartizanGame;
 
-use crate::{BitBoard, Konane256};
+use crate::{BitBoard, BoardGeometry, Konane, Konane256};
 
 impl<const W: usize, const H: usize, B: BitBoard + Hash + Send + Sync> PartizanGame
     for Konane256<W, H, B>
@@ -13,6 +13,18 @@ impl<const W: usize, const H: usize, B: BitBoard + Hash + Send + Sync> PartizanG
 
     fn right_moves(&self) -> Vec<Self> {
         self.all_moves_white()
+    }
+}
+
+impl<G: BoardGeometry + Send + Sync + Hash, B: BitBoard + Hash + Send + Sync> PartizanGame
+    for Konane<G, B>
+{
+    fn left_moves(&self) -> Vec<Self> {
+        self.move_iter::<false>().collect()
+    }
+
+    fn right_moves(&self) -> Vec<Self> {
+        self.move_iter::<true>().collect()
     }
 }
 
@@ -118,8 +130,8 @@ mod test {
         let fuzzy = Nus::new_nimber(Nimber::new(1));
         let zero = Nus::new_integer(0);
 
-        let mut tt = ParallelTranspositionTable::new();
-        let mut slp_nus = |n| slp(n).canonical_form(&mut tt).to_nus().expect("");
+        let tt = ParallelTranspositionTable::new();
+        let slp_nus = |n| slp(n).canonical_form(&tt).to_nus().expect("");
         assert_eq!(slp_nus(0), zero);
         assert_eq!(slp_nus(1), zero);
         assert_eq!(slp_nus(2), fuzzy);
@@ -134,7 +146,7 @@ mod test {
         for i in 11..70 {
             let game = slp(i);
             assert!(tt.lookup_position(&game).is_none());
-            let nus = game.canonical_form(&mut tt).to_nus().unwrap();
+            let nus = game.canonical_form(&tt).to_nus().unwrap();
             assert_eq!(
                 nus,
                 if i % 4 == 0 {
@@ -158,8 +170,8 @@ mod test {
         let down = Nus::new(DyadicRationalNumber::new(0, 0), -1, Nimber::new(0));
         let int = |i: i64| Nus::new_integer(i);
 
-        let mut tt = ParallelTranspositionTable::new();
-        let mut lot1_nus = |n| dbg!(lot1(n)).canonical_form(&mut tt).to_nus().expect("");
+        let tt = ParallelTranspositionTable::new();
+        let lot1_nus = |n| dbg!(lot1(n)).canonical_form(&tt).to_nus().expect("");
 
         assert_eq!(lot1_nus(0), zero);
         assert_eq!(lot1_nus(1), zero);
@@ -197,8 +209,8 @@ mod test {
         let int = |i: i64| Nus::new_integer(i);
         let rat = |n: i64, d_exp: u32| Nus::new_number(DyadicRationalNumber::new(n, d_exp));
 
-        let mut tt = ParallelTranspositionTable::new();
-        let mut lot2_nus = |n| dbg!(lot2(n)).canonical_form(&mut tt).to_nus().expect("");
+        let tt = ParallelTranspositionTable::new();
+        let lot2_nus = |n| dbg!(lot2(n)).canonical_form(&tt).to_nus().expect("");
 
         assert_eq!(lot2_nus(3), down);
         assert_eq!(lot2_nus(4), zero);
@@ -245,8 +257,8 @@ mod test {
             })
         };
 
-        let mut tt = ParallelTranspositionTable::new();
-        let mut lt1 = |n| dbg!(lt1(n)).canonical_form(&mut tt);
+        let tt = ParallelTranspositionTable::new();
+        let lt1 = |n| dbg!(lt1(n)).canonical_form(&tt);
 
         assert_eq!(lt1(1), zero());
         assert_eq!(lt1(2), fuzzy());

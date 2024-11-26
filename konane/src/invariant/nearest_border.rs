@@ -1,4 +1,4 @@
-use crate::{BitBoard, Konane256};
+use crate::{BitBoard, BoardGeometry, Konane, Konane256};
 
 use super::SinglePlayerInvariant;
 

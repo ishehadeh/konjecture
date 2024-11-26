@@ -1,5 +1,6 @@
 use std::fs::File;
 
+use bitarray::{BitArray, BitArrayBlock};
 use cgt::short::partizan::partizan_game::PartizanGame;
 use cgt::short::partizan::transposition_table::ParallelTranspositionTable;
 use itertools::Itertools;
@@ -26,6 +27,39 @@ fn all_NxN_in_8x8(w: usize, h: usize) -> impl Iterator<Item = Konane256<8, 8, u6
         })
 }
 
+fn n_stairs(n: usize, black_first: bool) -> impl Iterator<Item = Konane256<24, 24, BitArray<9>>> {
+    assert!(n <= 22);
+    assert!(n > 0);
+
+    let base_y = 2;
+    let base_x = 2;
+    (0..n).map(move |max_offset| {
+        let mut game = Konane256::empty();
+        let (left, right) = if black_first {
+            (TileState::Black, TileState::White)
+        } else {
+            (TileState::White, TileState::Black)
+        };
+
+        for offset in 0..=max_offset {
+            game.set_tile(base_x + offset, base_y + offset, left);
+            game.set_tile(base_x + offset + 1, base_y + offset, right);
+        }
+
+        game
+    })
+}
+
+pub fn u8_blocks<const N: usize, T: BitArrayBlock>(arr: &BitArray<N, T>) -> &[u8] {
+    // very evil look away
+    unsafe {
+        std::slice::from_raw_parts(
+            arr.blocks().as_ptr() as *const u8,
+            N * (std::mem::size_of::<T>() / std::mem::size_of::<u8>()),
+        )
+    }
+}
+
 pub fn main() {
     macro_rules! b {
         ($v:expr) => {
@@ -40,7 +74,7 @@ pub fn main() {
     // keep our transposition table (i.e. canonical form cache) around for the entire program
     let tt = Box::leak(Box::new(ParallelTranspositionTable::new()));
 
-    let invariants: Vec<(&'static str, Box<dyn Invariant<Konane256<8, 8, _>>>)> = vec![
+    let invariants: Vec<(&'static str, Box<dyn Invariant<Konane256<24, 24, _>>>)> = vec![
         ("wH", w!(PieceHeight)),
         ("bH", b!(PieceHeight)),
         ("wCnt", w!(PieceCount)),
@@ -63,18 +97,22 @@ pub fn main() {
     let mut w_bitmaps = Vec::new();
     let mut canon = Vec::new();
     let mut invariant_values = Vec::from_iter(invariants.iter().map(|_| Vec::new()));
-    let mut i = 0u64;
-    let five_percent = 3u64.pow(W * H) / 20;
-    for game in all_NxN_in_8x8(W as usize, H as usize) {
+    let mut i = 0;
+    let games = n_stairs(10, true).collect::<Vec<_>>();
+    let five_percent = games.len() / 20;
+    for game in &games {
         canon.push(game.canonical_form(tt).to_string());
-        b_bitmaps.push(game.black);
-        w_bitmaps.push(game.white);
+        b_bitmaps.push(u8_blocks(&game.black));
+        w_bitmaps.push(u8_blocks(&game.white));
 
         for (i, (_, invariant)) in invariants.iter().enumerate() {
             invariant_values[i].push(invariant.compute(game.clone()));
         }
-        if i % five_percent == 0 {
-            println!("complete: {}%", (i / five_percent) * 5)
+
+        if five_percent > 0 {
+            if i % five_percent == 0 {
+                println!("complete: {}%", (i / five_percent) * 5)
+            }
         }
         i += 1;
     }
@@ -86,11 +124,11 @@ pub fn main() {
     )
     .expect("failed to create dataframe");
     for (i, (name, _)) in invariants.iter().enumerate() {
-        df.with_column(Column::new((*name).into(), &invariant_values[i]))
+        df.with_column(Series::new((*name).into(), &invariant_values[i]))
             .unwrap();
     }
 
     let file = File::create("polars.parquet").expect("could not create file");
 
-    ParquetWriter::new(file).finish(&mut df);
+    ParquetWriter::new(file).finish(&mut df).unwrap();
 }
