@@ -26,7 +26,8 @@
   authors: (authors, affls),
   abstract: include "partials/00-abstract.typ",
   // keywords: ("keyword one", "keyword two", "keyword three"),
-  bibliography: bibliography("main.bib"),
+  bibliography: bibliography("main.bib", style: "ieee"),
   appendix: none,
 )
 
+#include "partials/01-konane.typ"
