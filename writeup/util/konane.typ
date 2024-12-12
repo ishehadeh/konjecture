@@ -1,25 +1,26 @@
 
 
 // render a Konane board
-#let konane(str, tile-size: 1em, cell-names: true) = {
+#let konane(str, tile-size: 1em,  hlabel: (n) => n, vlabel: (n) => n) = {
   let str_rows = str.trim().split("\n").map(v => v.trim())
   let width = calc.max(..str_rows.map(r => r.len()))
   let height = str_rows.len()
 
+
   grid(
-    rows: height + if cell-names { 1 } else { 0 },
-    columns: width + if cell-names { 1 } else { 0 },
+    rows: (if hlabel != none { (auto,) } else { () }) + (tile-size + 6pt,) * height,
+    columns: (if vlabel != none { (auto,) } else { () }) + (tile-size + 6pt,) * width,
     inset: 3pt,
-    ..if cell-names { ([],) } else { () },
-    ..if cell-names {
-      range(0, width).map(i => [#i])
+    ..if vlabel != none { ([],) } else { () },
+    ..if hlabel != none {
+      range(0, width).map(i => align(center)[#hlabel(i)])
     } else {
       ()
     },
     ..str_rows.enumerate().map(
       ((row_i, row)) => (
-        ..if cell-names {
-          ([#row_i],)
+        ..if vlabel != none {
+          (align(horizon)[#vlabel(row_i)],)
         } else {
           ()
         },

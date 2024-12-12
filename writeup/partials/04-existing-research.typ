@@ -1,4 +1,3 @@
-#import "../util/bib.typ": bib
 #import "../util/konane.typ": konane
 
 = Known Facts
@@ -97,5 +96,3 @@ This is a living list of patterns observed in real play, and general facts about
 - When the game was first documented by European settlers the most common board size was $14 times 17$, although anything from $8 times 8$, to $13 times 20$ was also used. Modern games are often played on an $18 times 18$ board @nowakowski1xnKonaneSummary2010.
 - "In real Konane games, play frequently proceeds to the corners after center of the board has been largely cleared" @ernstPlayingKonaneMathematically1995
 
-
-#bib()

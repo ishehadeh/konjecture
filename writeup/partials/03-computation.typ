@@ -1,4 +1,3 @@
-#import "../util/bib.typ": bib
 #import "../util/theorems.typ": definition, example
 #import "../util/konane.typ": konane
 
@@ -67,5 +66,3 @@ The current list of invariants is:
 - The number-value of a game
 
 All of these can (except for the game values), can be calculated for a single player, or both.
-
-#bib()

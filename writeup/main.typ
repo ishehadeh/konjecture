@@ -1,13 +1,8 @@
 #import "@preview/classic-jmlr:0.4.0": jmlr
 #import "util/konane.typ": konane
-#import "util/bib.typ": bib
 #import "@preview/ctheorems:1.1.3": *
-#show: thmrules
 
 // Make Kōnane easier to type
-#show regex("Konane"): "Kōnane"
-
-
 #let affls = (
   smcm-math: (
     department: "Division of Mathematics",
@@ -27,9 +22,13 @@
   authors: (authors, affls),
   abstract: include "partials/00-abstract.typ",
   // keywords: ("keyword one", "keyword two", "keyword three"),
-  bibliography: bib(),
+  bibliography: bibliography("./main.bib", style: "ieee"),
   appendix: none,
 )
+
+#show: thmrules
+#show regex("Konane"): "Kōnane"
+
 
 #include "partials/01-konane.typ"
 #include "partials/02-conjecturing.typ"
