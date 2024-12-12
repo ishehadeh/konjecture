@@ -58,7 +58,6 @@ grid(columns: 3, gutter: 40pt,
 
 #align(left + horizon, pad(left: 4em, [
   #slp(7)
-  #pause
   #slp(8)
 ]))
 
@@ -186,6 +185,7 @@ Now we need to know the outcome of $"SLP"(2)$ and $"SLP"(1)$
 3. Determine winners of ancestor nodes
 
 == Conjecturing
+
 #slide(composer: (3fr, 1em, 1fr))[
 #align(center + horizon)[
   #table(

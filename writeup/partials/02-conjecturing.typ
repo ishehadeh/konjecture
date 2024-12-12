@@ -12,13 +12,13 @@ In our case, an object is a single Konane position, and invariants include thing
     rows: 3, 
     table.header([*Games*], [*\#Black* ($I_1$)], [*\#White* ($I_2$)], [*\#Moves* ($I_3$)]),
     
-    konane("xox\n_", cell-names: false),
+    konane("xox\n_"),
     $2$, $1$, $0$, 
     
-    konane("x_o\nxo", cell-names: false),
+    konane("x_o\nxo"),
     $2$, $2$, $1$, 
 
-    konane("ox\n_xo", cell-names: false),
+    konane("ox\n_xo"),
     $2$, $2$, $2$, 
   )
 ]<eg-conjecturing-data>
