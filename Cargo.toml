@@ -1,5 +1,5 @@
 [workspace]
-members = ["bitarray", "konane", "konane.py"]
+members = ["konane", "konane.py"]
 resolver = "2"
 [profile.release]
 debug = true

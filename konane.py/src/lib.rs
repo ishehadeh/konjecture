@@ -4,9 +4,7 @@ use cgt::short::partizan::{
     partizan_game::PartizanGame, transposition_table::ParallelTranspositionTable,
 };
 
-use bitarray::BitArray;
 use pyo3::prelude::*;
-use pyo3::types::PyInt;
 
 pub type Konane8x8 = Konane256<8, 8, u64>;
 
@@ -156,10 +154,10 @@ impl_py_partizan_game!(
 
 impl_py_partizan_game!(
     "Konane1024",
-    Konane<(usize, usize), BitArray<16, u64>>,
+    Konane<(usize, usize), bnum::BUint<16>>,
     Konane1024Py,
     "ParallelTranspositionTableKonane",
-    ParallelTranspositionTable<Konane<(usize, usize), BitArray<16, u64>>>,
+    ParallelTranspositionTable<Konane<(usize, usize), bnum::BUint<16>>>,
     TTKonane1024Py,
     BitArray<16, u64>
 );
@@ -168,15 +166,15 @@ impl_py_partizan_game!(
 impl Konane1024Py {
     #[staticmethod]
     fn from_bitmaps(width: usize, height: usize, black: &[u8], white: &[u8]) -> PyResult<Self> {
-        let mut inner: Konane<(usize, usize), BitArray<16, u64>> = Konane::empty((width, height));
+        let mut inner: Konane<(usize, usize), bnum::BUint<16>> = Konane::empty((width, height));
         assert_eq!(black.len(), white.len());
         for i in 0..black.len() / 8 {
-            inner.black.blocks_mut()[15 - i] = u64::from_ne_bytes(
+            inner.black.digits_mut()[15 - i] = u64::from_ne_bytes(
                 black[(white.len() - (i + 1) * 8)..(white.len() - i * 8)]
                     .try_into()
                     .unwrap(),
             );
-            inner.white.blocks_mut()[15 - i] = u64::from_ne_bytes(
+            inner.white.digits_mut()[15 - i] = u64::from_ne_bytes(
                 white[(white.len() - (i + 1) * 8)..(white.len() - i * 8)]
                     .try_into()
                     .unwrap(),

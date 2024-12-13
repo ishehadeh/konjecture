@@ -18,7 +18,6 @@ impl<G: BoardGeometry + Send + Sync + Hash, B: BitBoard + Hash + Send + Sync> Pa
 
 #[cfg(test)]
 mod test {
-    use bitarray::BitArray;
     use cgt::{
         numeric::{dyadic_rational_number::DyadicRationalNumber, nimber::Nimber},
         short::partizan::{
@@ -81,7 +80,7 @@ mod test {
         tail_len: usize,
         n: usize,
         offset: usize,
-    ) -> Konane256<40, 8, BitArray<5, u64>> {
+    ) -> Konane256<40, 8, bnum::BUint<5>> {
         let mut game = Konane256::empty(StaticBoard::<40, 8>);
         for i in 0..tail_len {
             game.set_tile(

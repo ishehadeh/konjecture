@@ -1,4 +1,3 @@
-use bitarray::BitArray;
 use cgt::short::partizan::partizan_game::PartizanGame;
 use cgt::short::partizan::transposition_table::ParallelTranspositionTable;
 use itertools::Itertools;
@@ -22,7 +21,7 @@ fn linear_with_tail(
     tail_len: usize,
     n: usize,
     offset: usize,
-) -> Konane256<64, 12, BitArray<12, u64>> {
+) -> Konane256<64, 12, bnum::BUint<12>> {
     let mut game = Konane256::empty(StaticBoard);
     for i in 0..tail_len {
         game.set_tile(

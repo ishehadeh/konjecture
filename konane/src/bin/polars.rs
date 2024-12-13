@@ -1,6 +1,6 @@
 use std::fs::File;
 
-use bitarray::{BitArray, BitArrayBlock};
+use bnum::BUint;
 use cgt::short::partizan::partizan_game::PartizanGame;
 use cgt::short::partizan::transposition_table::ParallelTranspositionTable;
 use itertools::Itertools;
@@ -27,7 +27,7 @@ fn all_NxN_in_8x8(w: usize, h: usize) -> impl Iterator<Item = Konane256<8, 8, u6
         })
 }
 
-fn n_stairs(n: usize, black_first: bool) -> impl Iterator<Item = Konane256<24, 24, BitArray<9>>> {
+fn n_stairs(n: usize, black_first: bool) -> impl Iterator<Item = Konane256<24, 24, BUint<9>>> {
     assert!(n <= 22);
     assert!(n > 0);
 
@@ -50,12 +50,12 @@ fn n_stairs(n: usize, black_first: bool) -> impl Iterator<Item = Konane256<24, 2
     })
 }
 
-pub fn u8_blocks<const N: usize, T: BitArrayBlock>(arr: &BitArray<N, T>) -> &[u8] {
+pub fn u8_blocks<const N: usize>(arr: &BUint<N>) -> &[u8] {
     // very evil look away
     unsafe {
         std::slice::from_raw_parts(
-            arr.blocks().as_ptr() as *const u8,
-            N * (std::mem::size_of::<T>() / std::mem::size_of::<u8>()),
+            arr.digits().as_ptr() as *const u8,
+            BUint::<N>::BITS as usize / 8,
         )
     }
 }

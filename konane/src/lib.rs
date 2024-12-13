@@ -5,71 +5,9 @@ use std::fmt::Debug;
 mod konane_dyn_dim;
 pub use konane_dyn_dim::*;
 pub mod invariant;
-use bitarray::{iter::BitArrayIter, BitArray};
 use bitboard::BitBoard;
 
-impl<const N: usize> BitBoard for BitArray<N, u64> {
-    const BIT_LENGTH: usize = 64 * N;
-    type Iter<'a> = BitArrayIter<'a, true, false, N, u64>;
-
-    fn empty() -> Self {
-        [0u64; N].into()
-    }
-
-    fn one() -> Self {
-        let mut v = BitArray::empty();
-        v.set(0);
-        v
-    }
-
-    #[inline(always)]
-    fn all() -> Self {
-        !Self::empty()
-    }
-
-    #[inline(always)]
-    fn first_set(&self) -> Option<usize> {
-        BitArray::<N, u64>::first_set(self)
-    }
-
-    #[inline(always)]
-    fn first_clear(&self) -> Option<usize> {
-        BitArray::<N, u64>::first_clear(self)
-    }
-
-    #[inline(always)]
-    fn count_set(&self) -> usize {
-        BitArray::<N, u64>::iter_set(self).count()
-    }
-
-    #[inline(always)]
-    fn count_clear(&self) -> usize {
-        BitArray::<N, u64>::iter_set(self).count()
-    }
-
-    #[inline(always)]
-    fn last_set(&self) -> Option<usize> {
-        self.last_set()
-    }
-
-    fn iter_set(&self) -> Self::Iter<'_> {
-        BitArray::iter_set(&self)
-    }
-
-    fn set(&mut self, idx: usize) {
-        BitArray::set(self, idx);
-    }
-
-    fn get(&self, idx: usize) -> bool {
-        BitArray::get(self, idx)
-    }
-
-    fn clear(&mut self, idx: usize) {
-        BitArray::clear(self, idx);
-    }
-}
-
-pub type Konane256<const W: usize = 16, const H: usize = 16, B: BitBoard = bnum::BUint<4>> =
+pub type Konane256<const W: usize = 16, const H: usize = 16, B = bnum::BUint<4>> =
     Konane<StaticBoard<W, H>, B>;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]

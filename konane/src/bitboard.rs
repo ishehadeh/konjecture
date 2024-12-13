@@ -195,4 +195,82 @@ impl_bit_board!(u32);
 impl_bit_board!(u64);
 impl_bit_board!(u128);
 impl_bit_board!(usize);
-impl_bit_board!(bnum::BUint<4>);
+
+impl<const N: usize> BitBoard for bnum::BUint<N> {
+    const BIT_LENGTH: usize = Self::BITS as usize;
+    type Iter<'a> = BitIter<Self>;
+
+    #[inline(always)]
+    fn empty() -> Self {
+        0u8.into()
+    }
+
+    #[inline(always)]
+    fn one() -> Self {
+        1u8.into()
+    }
+
+    #[inline(always)]
+    fn all() -> Self {
+        Self::MAX
+    }
+
+    #[inline(always)]
+    fn set(&mut self, idx: usize) {
+        self.set_bit(idx as u32, true);
+    }
+
+    #[inline(always)]
+    fn get(&self, idx: usize) -> bool {
+        self.bit(idx as u32)
+    }
+
+    #[inline(always)]
+    fn clear(&mut self, idx: usize) {
+        self.set_bit(idx as u32, false)
+    }
+
+    #[inline(always)]
+    fn first_set(&self) -> Option<usize> {
+        let trailing_zeros = (*self).trailing_zeros() as usize;
+        if trailing_zeros == Self::BIT_LENGTH {
+            None
+        } else {
+            Some(trailing_zeros)
+        }
+    }
+
+    #[inline(always)]
+    fn first_clear(&self) -> Option<usize> {
+        let trailing_ones = (*self).trailing_ones() as usize;
+        if trailing_ones == Self::BIT_LENGTH {
+            None
+        } else {
+            Some(trailing_ones)
+        }
+    }
+
+    #[inline(always)]
+    fn count_set(&self) -> usize {
+        self.count_ones() as usize
+    }
+
+    #[inline(always)]
+    fn count_clear(&self) -> usize {
+        self.count_zeros() as usize
+    }
+
+    #[inline(always)]
+    fn last_set(&self) -> Option<usize> {
+        let leading_zeros = (*self).leading_zeros() as usize;
+        if leading_zeros == Self::BIT_LENGTH {
+            None
+        } else {
+            Some(Self::BIT_LENGTH - 1 - leading_zeros)
+        }
+    }
+
+    fn iter_set(&self) -> Self::Iter<'_> {
+        BitIter::new(*self)
+    }
+}

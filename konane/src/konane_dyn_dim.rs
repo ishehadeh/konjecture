@@ -520,11 +520,8 @@ impl<B: BitBoard> MoveBitmap<B> {
 
 #[cfg(test)]
 mod test {
-    use std::str::FromStr;
-
-    use bitarray::BitArray;
-
     use crate::{Konane, TileState};
+    use std::str::FromStr;
 
     #[test]
     pub fn move_over_block_boundary() {
@@ -549,7 +546,7 @@ mod test {
 
     #[test]
     pub fn moveset_on_full_board_is_empty_16x16() {
-        let board: Konane<(usize, usize), BitArray<4, u64>> = Konane::empty((16, 16));
+        let board: Konane<(usize, usize), bnum::BUint<4>> = Konane::empty((16, 16));
 
         assert_eq!(board.move_iter::<false>().next(), None);
         assert_eq!(board.move_iter::<true>().next(), None);
@@ -557,7 +554,7 @@ mod test {
 
     #[test]
     pub fn moveset_one_piece() {
-        let mut board: Konane<(usize, usize), BitArray<4, u64>> = Konane::empty((16, 16));
+        let mut board: Konane<(usize, usize), bnum::BUint<4>> = Konane::empty((16, 16));
         board.set_tile(3, 3, TileState::Black);
         assert_eq!(board.move_iter::<false>().next(), None);
         assert_eq!(board.move_iter::<true>().next(), None);
