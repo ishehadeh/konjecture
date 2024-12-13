@@ -3,11 +3,12 @@ use cgt::short::partizan::partizan_game::PartizanGame;
 use cgt::short::partizan::transposition_table::ParallelTranspositionTable;
 use itertools::Itertools;
 use konane::{
+    bitboard::BitBoard,
     invariant::{
-        CanonicalFormNimber, CanonicalFormNumber, CaptureCount, Invariant, MoveCount,
-        NearestBorder, PartizanInvariant, PieceCount, PieceHeight, PieceWidth,
+        CanonicalFormNimber, CaptureCount, Invariant, MoveCount, NearestBorder, PartizanInvariant,
+        PieceCount, PieceHeight, PieceWidth,
     },
-    BitBoard, Konane256, TileState,
+    Konane256, StaticBoard, TileState,
 };
 use std::{collections::VecDeque, io::Write};
 pub struct PermutationIter<const W: usize, const H: usize, B: BitBoard> {
@@ -22,7 +23,7 @@ fn linear_with_tail(
     n: usize,
     offset: usize,
 ) -> Konane256<64, 12, BitArray<12, u64>> {
-    let mut game = Konane256::empty();
+    let mut game = Konane256::empty(StaticBoard);
     for i in 0..tail_len {
         game.set_tile(
             1,
@@ -58,7 +59,7 @@ fn all_NxN_in_8x8(w: usize, h: usize) -> impl Iterator<Item = Konane256<8, 8, u6
         .map(|_| [TileState::Empty, TileState::Black, TileState::White].into_iter())
         .multi_cartesian_product()
         .map(move |v| {
-            let mut game = Konane256::empty();
+            let mut game = Konane256::empty(StaticBoard);
             let mut i = 0;
             for x in start_x..(start_x + w) {
                 for y in start_y..(start_y + h) {

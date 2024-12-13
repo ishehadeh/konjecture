@@ -4,7 +4,7 @@ use bitarray::{BitArray, BitArrayBlock};
 use cgt::short::partizan::partizan_game::PartizanGame;
 use cgt::short::partizan::transposition_table::ParallelTranspositionTable;
 use itertools::Itertools;
-use konane::{invariant::*, Konane256, TileState};
+use konane::{invariant::*, Konane256, StaticBoard, TileState};
 use polars::prelude::*;
 
 #[allow(non_snake_case)]
@@ -15,7 +15,7 @@ fn all_NxN_in_8x8(w: usize, h: usize) -> impl Iterator<Item = Konane256<8, 8, u6
         .map(|_| [TileState::Empty, TileState::Black, TileState::White].into_iter())
         .multi_cartesian_product()
         .map(move |v| {
-            let mut game = Konane256::empty();
+            let mut game = Konane256::empty(StaticBoard);
             let mut i = 0;
             for x in start_x..(start_x + w) {
                 for y in start_y..(start_y + h) {
@@ -34,7 +34,7 @@ fn n_stairs(n: usize, black_first: bool) -> impl Iterator<Item = Konane256<24, 2
     let base_y = 2;
     let base_x = 2;
     (0..n).map(move |max_offset| {
-        let mut game = Konane256::empty();
+        let mut game = Konane256::empty(StaticBoard);
         let (left, right) = if black_first {
             (TileState::Black, TileState::White)
         } else {

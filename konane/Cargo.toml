@@ -11,7 +11,7 @@ duckdb = { version = "=1.1.1", optional = true, features = ["bundled"] }
 itertools = "*"
 thiserror = "*"
 polars = { version = "*", optional = true , features = ["polars-io", "parquet", "dtype-array"]}
-
+bnum = "*"
 [features]
 cgt = ["dep:cgt"]
 rand = ["dep:rand"]
@@ -26,11 +26,6 @@ required-features = ["cgt"]
 [[bin]]
 name = "generate-conjecturing-input"
 required-features = ["rand", "cgt"]
-
-[[bin]]
-name = "duckdb"
-required-features = ["duckdb", "cgt"]
-
 
 [[bin]]
 name = "polars"

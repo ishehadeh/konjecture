@@ -1,9 +1,11 @@
 use std::str::FromStr;
 
+use thiserror::Error;
+
 use crate::{
     bitboard::Direction,
     const_direction::{ConstDirection, Down, Left, Right, Up},
-    BitBoard, KonaneParseError, MoveGenerator, TileState,
+    BitBoard, TileState,
 };
 
 pub trait BoardGeometry: Clone + std::fmt::Debug + PartialEq + Eq {
@@ -21,7 +23,7 @@ impl BoardGeometry for (usize, usize) {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, PartialOrd, Ord, Hash)]
 pub struct StaticBoard<const W: usize, const H: usize>;
 impl<const W: usize, const H: usize> BoardGeometry for StaticBoard<W, H> {
     fn width(&self) -> usize {
@@ -106,6 +108,12 @@ impl<G: BoardGeometry, B: BitBoard> std::fmt::Debug for Konane<G, B> {
     }
 }
 
+impl<const W: usize, const H: usize, B: BitBoard> Konane<StaticBoard<W, H>, B> {
+    pub fn must_parse<S: AsRef<str>>(str: S) -> Self {
+        FromStr::from_str(str.as_ref()).expect("failed to parse board")
+    }
+}
+
 impl<G: BoardGeometry, B: BitBoard> Konane<G, B> {
     pub fn empty(geometry: G) -> Self {
         assert!(geometry.width() * geometry.height() <= B::BIT_LENGTH);
@@ -115,6 +123,21 @@ impl<G: BoardGeometry, B: BitBoard> Konane<G, B> {
             white: B::empty(),
             black: B::empty(),
         }
+    }
+
+    pub fn checkerboard(geometry: G) -> Self {
+        let mut board = Self::empty(geometry);
+        for x in 0..board.width() {
+            for y in 0..board.height() {
+                let tile = if (y + x) % 2 == 0 {
+                    TileState::Black
+                } else {
+                    TileState::White
+                };
+                board.set_tile(x, y, tile);
+            }
+        }
+        board
     }
 
     pub fn width(&self) -> usize {
@@ -188,6 +211,14 @@ impl<G: BoardGeometry, B: BitBoard> Konane<G, B> {
         iter.gen.advance_against::<WHITE, Up, _>(self);
         iter.reset_iter();
         iter
+    }
+
+    pub fn all_moves_black(&self) -> Vec<Self> {
+        self.move_iter::<false>().collect()
+    }
+
+    pub fn all_moves_white(&self) -> Vec<Self> {
+        self.move_iter::<true>().collect()
     }
 
     pub fn svg<W: std::io::Write>(&self, out: &mut W) -> std::io::Result<()> {
@@ -300,6 +331,21 @@ impl<'a, const WHITE: bool, G: BoardGeometry, B: BitBoard> Iterator for MoveIter
     }
 }
 
+#[derive(Error, Debug, Clone)]
+pub enum KonaneParseError {
+    #[error("expected one of 'x', 'o', or '_', got '{c}'")]
+    UnexpectedCharacter { c: char },
+
+    #[error("tile at <{x}, {y}> '{c}', is out of bounds for board of width {w} and height {h}")]
+    OutOfBounds {
+        c: char,
+        x: usize,
+        y: usize,
+        w: usize,
+        h: usize,
+    },
+}
+
 impl<B: BitBoard> FromStr for Konane<(usize, usize), B> {
     fn from_str(s: &str) -> Result<Self, KonaneParseError> {
         let row_iter = s.trim().split("\n").map(|row| row.trim());
@@ -310,6 +356,37 @@ impl<B: BitBoard> FromStr for Konane<(usize, usize), B> {
 
         for (y, row_txt) in row_iter.enumerate() {
             for (x, c) in row_txt.chars().enumerate() {
+                match c {
+                    'x' => game.set_tile(x, y, TileState::White),
+                    'o' => game.set_tile(x, y, TileState::Black),
+                    '_' => game.set_tile(x, y, TileState::Empty),
+                    c => return Err(KonaneParseError::UnexpectedCharacter { c }),
+                }
+            }
+        }
+
+        Ok(game)
+    }
+
+    type Err = KonaneParseError;
+}
+
+impl<const W: usize, const H: usize, B: BitBoard> FromStr for Konane<StaticBoard<W, H>, B> {
+    fn from_str(s: &str) -> Result<Self, KonaneParseError> {
+        let row_iter = s.trim().split("\n").map(|row| row.trim());
+        let mut game = Self::empty(Default::default());
+
+        for (y, row_txt) in row_iter.enumerate() {
+            for (x, c) in row_txt.chars().enumerate() {
+                if x >= W || y >= H {
+                    return Err(KonaneParseError::OutOfBounds {
+                        c,
+                        x,
+                        y,
+                        w: W,
+                        h: H,
+                    });
+                }
                 match c {
                     'x' => game.set_tile(x, y, TileState::White),
                     'o' => game.set_tile(x, y, TileState::Black),
@@ -408,6 +485,27 @@ impl<B: BitBoard> MoveBitmap<B> {
             Direction::Down => ind - geom.width() * 2 * self.offset,
         }
     }
+    pub fn apply_move_to_mut<const TO_WHITE: bool, G: BoardGeometry, Dir: ConstDirection>(
+        &self,
+        g: &mut Konane<G, B>,
+        ind: usize,
+    ) {
+        let step = bit_offset_of_direction_abs::<Dir, G>(&g.geometry);
+        let origin = self.get_origin_of::<G, Dir>(&g.geometry, ind);
+        let start = ind.min(origin);
+        let end = ind.max(origin);
+        let mut i = start;
+        while i <= end {
+            g.black.clear(i);
+            g.white.clear(i);
+            i += step;
+        }
+        if TO_WHITE {
+            g.white.set(ind)
+        } else {
+            g.black.set(ind)
+        }
+    }
 
     pub fn apply_move_to<const TO_WHITE: bool, G: BoardGeometry, Dir: ConstDirection>(
         &self,
@@ -415,22 +513,7 @@ impl<B: BitBoard> MoveBitmap<B> {
         ind: usize,
     ) -> Konane<G, B> {
         let mut new_game = g.clone();
-        let step = bit_offset_of_direction_abs::<Dir, G>(&g.geometry);
-        let origin = self.get_origin_of::<G, Dir>(&g.geometry, ind);
-        let start = ind.min(origin);
-        let end = ind.max(origin);
-        let mut i = start;
-        while i <= end {
-            new_game.black.clear(i);
-            new_game.white.clear(i);
-            i += step;
-        }
-        if TO_WHITE {
-            new_game.white.set(ind)
-        } else {
-            new_game.black.set(ind)
-        }
-
+        self.apply_move_to_mut::<TO_WHITE, G, Dir>(&mut new_game, ind);
         new_game
     }
 }

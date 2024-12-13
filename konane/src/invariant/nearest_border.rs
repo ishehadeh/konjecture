@@ -4,17 +4,17 @@ use super::SinglePlayerInvariant;
 
 pub struct NearestBorder;
 
-impl<const W: usize, const H: usize, B: BitBoard> SinglePlayerInvariant<Konane256<W, H, B>>
-    for NearestBorder
-{
-    fn compute(&self, player: B) -> f64 {
+impl<G: BoardGeometry, B: BitBoard> SinglePlayerInvariant<Konane<G, B>> for NearestBorder {
+    fn compute(&self, (geom, board): (&G, &B)) -> f64 {
+        let w = geom.width();
+        let h = geom.height();
         (0..B::BIT_LENGTH)
-            .filter(|&index| B::one() << index & &player != B::empty())
+            .filter(|&index| B::one() << index & board != B::empty())
             .map(|piece| {
-                let y = piece / W;
-                let x = piece - W * y;
-                let x_dist = if x > W / 2 { W - x } else { x };
-                let y_dist = if y > H { H - y } else { y };
+                let y = piece / w;
+                let x = piece - w * y;
+                let x_dist = if x > w / 2 { w - x } else { x };
+                let y_dist = if y > h { h - y } else { y };
                 x_dist.min(y_dist) as f64
             })
             .enumerate()

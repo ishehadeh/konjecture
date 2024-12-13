@@ -2,19 +2,7 @@ use std::hash::Hash;
 
 use cgt::short::partizan::partizan_game::PartizanGame;
 
-use crate::{BitBoard, BoardGeometry, Konane, Konane256};
-
-impl<const W: usize, const H: usize, B: BitBoard + Hash + Send + Sync> PartizanGame
-    for Konane256<W, H, B>
-{
-    fn left_moves(&self) -> Vec<Self> {
-        self.all_moves_black()
-    }
-
-    fn right_moves(&self) -> Vec<Self> {
-        self.all_moves_white()
-    }
-}
+use crate::{BitBoard, BoardGeometry, Konane};
 
 impl<G: BoardGeometry + Send + Sync + Hash, B: BitBoard + Hash + Send + Sync> PartizanGame
     for Konane<G, B>
@@ -40,10 +28,10 @@ mod test {
         },
     };
 
-    use crate::{Konane256, TileState};
+    use crate::{Konane256, StaticBoard, TileState};
 
     fn gen_solid_linear_pattern(n: usize) -> Konane256<256, 1> {
-        let mut game = Konane256::<256, 1>::empty();
+        let mut game = Konane256::empty(StaticBoard::<256, 1>);
         for x in 1..=n {
             game.set_tile(
                 x,
@@ -60,7 +48,7 @@ mod test {
     }
 
     fn linear_with_offset_tail1(n: usize) -> Konane256<64, 4> {
-        let mut game = Konane256::empty();
+        let mut game = Konane256::empty(StaticBoard::<64, 4>);
 
         for x in 0..n {
             if x < 1 {
@@ -94,7 +82,7 @@ mod test {
         n: usize,
         offset: usize,
     ) -> Konane256<40, 8, BitArray<5, u64>> {
-        let mut game = Konane256::empty();
+        let mut game = Konane256::empty(StaticBoard::<40, 8>);
         for i in 0..tail_len {
             game.set_tile(
                 1,

@@ -62,7 +62,7 @@ pub trait BitBoard:
 where
     Self: Sized,
 {
-    type Iter<'a>: Iterator<Item = usize>
+    type Iter<'a>: Iterator<Item = usize> + std::fmt::Debug
     where
         Self: 'a;
     const BIT_LENGTH: usize;
@@ -82,37 +82,38 @@ where
     fn iter_set<'a>(&'a self) -> Self::Iter<'a>;
 }
 
-pub struct BitIter<T: bitarray::BitArrayBlock> {
+#[derive(Clone, Copy, Debug)]
+pub struct BitIter<T: BitBoard> {
     index: usize,
     value: T,
 }
 
-impl<T: bitarray::BitArrayBlock> BitIter<T> {
+impl<T: BitBoard> BitIter<T> {
     pub fn new(value: T) -> BitIter<T> {
         BitIter {
-            index: value.first_set().unwrap_or(T::BLOCK_LENGTH),
+            index: value.first_set().unwrap_or(T::BIT_LENGTH),
             value,
         }
     }
 }
 
-impl<T: bitarray::BitArrayBlock> Iterator for BitIter<T> {
+impl<T: BitBoard> Iterator for BitIter<T> {
     type Item = usize;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.index == T::BLOCK_LENGTH {
+        if self.index == T::BIT_LENGTH {
             None
         } else {
             self.value.clear(self.index);
             let index = self.index;
-            self.index = self.value.first_set().unwrap_or(T::BLOCK_LENGTH);
+            self.index = self.value.first_set().unwrap_or(T::BIT_LENGTH);
             Some(index)
         }
     }
 }
 
 macro_rules! impl_bit_board {
-    ($ty:ident) => {
+    ($ty:path) => {
         impl BitBoard for $ty {
             const BIT_LENGTH: usize = std::mem::size_of::<$ty>() * 8;
             type Iter<'a> = BitIter<$ty>;
@@ -194,3 +195,4 @@ impl_bit_board!(u32);
 impl_bit_board!(u64);
 impl_bit_board!(u128);
 impl_bit_board!(usize);
+impl_bit_board!(bnum::BUint<4>);

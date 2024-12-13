@@ -1,11 +1,10 @@
-use std::{marker::PhantomData, ops::BitOr};
+use std::marker::PhantomData;
 
 use crate::{
     const_direction::{Down, Left, Right, Up},
-    BitBoard, Konane256,
+    BitBoard, BoardGeometry, Konane,
 };
 
-use cgt::short::partizan::{partizan_game::PartizanGame, transposition_table::TranspositionTable};
 // Invariant Submodules
 pub use nearest_border::*;
 mod nearest_border;
@@ -17,26 +16,28 @@ pub use cgt_value::*;
 
 /// A game which can be split into seperate structures representing each player individually.
 pub trait TwoPlayerGame {
-    type B;
+    type B<'a>
+    where
+        Self: 'a;
 
-    fn left(&self) -> Self::B;
-    fn right(&self) -> Self::B;
+    fn left<'a>(&'a self) -> Self::B<'a>;
+    fn right<'a>(&'a self) -> Self::B<'a>;
 }
 
-impl<const W: usize, const H: usize, B: BitBoard> TwoPlayerGame for Konane256<W, H, B> {
-    type B = B;
+impl<G: BoardGeometry, B: BitBoard> TwoPlayerGame for Konane<G, B> {
+    type B<'a> = (&'a G, &'a B) where G: 'a, B: 'a;
 
-    fn left(&self) -> Self::B {
-        self.black.clone()
+    fn left(&self) -> Self::B<'_> {
+        (&self.geometry, &self.black)
     }
 
-    fn right(&self) -> Self::B {
-        self.white.clone()
+    fn right(&self) -> Self::B<'_> {
+        (&self.geometry, &self.white)
     }
 }
 
 pub trait SinglePlayerInvariant<G: TwoPlayerGame> {
-    fn compute(&self, player: G::B) -> f64;
+    fn compute(&self, player: G::B<'_>) -> f64;
 }
 
 pub trait Invariant<G> {
@@ -82,7 +83,7 @@ impl<G: TwoPlayerGame, T: SinglePlayerInvariant<G>> PartizanInvariant<G, T, true
     }
 }
 
-impl<G: TwoPlayerGame, T: SinglePlayerInvariant<G>> Invariant<G>
+impl<'a, G: TwoPlayerGame, T: SinglePlayerInvariant<G>> Invariant<G>
     for PartizanInvariant<G, T, false>
 {
     #[inline(always)]
@@ -98,54 +99,50 @@ impl<G: TwoPlayerGame, T: SinglePlayerInvariant<G>> Invariant<G> for PartizanInv
     }
 }
 
-impl<G: TwoPlayerGame, T: SinglePlayerInvariant<G>> Invariant<G> for ImpartialInvariant<G, T>
+impl<G: BoardGeometry, B: BitBoard, T> Invariant<Konane<G, B>>
+    for ImpartialInvariant<Konane<G, B>, T>
 where
-    G::B: BitOr<G::B, Output = G::B>,
+    T: SinglePlayerInvariant<Konane<G, B>>,
 {
     #[inline(always)]
-    fn compute(&self, game: G) -> f64 {
-        self.inner.compute(game.left() | game.right())
+    fn compute(&self, game: Konane<G, B>) -> f64 {
+        let board = game.white.clone() | &game.black;
+        self.inner.compute((&game.geometry, &board))
     }
 }
 
 /// Vertical distance between the highest and lowest piece
 pub struct PieceHeight;
-impl<const W: usize, const H: usize, B: BitBoard> SinglePlayerInvariant<Konane256<W, H, B>>
-    for PieceHeight
-{
-    fn compute(&self, game: B) -> f64 {
-        let Some(first_set_ind) = game.first_set() else {
+impl<G: BoardGeometry, B: BitBoard> SinglePlayerInvariant<Konane<G, B>> for PieceHeight {
+    fn compute(&self, (geom, board): (&G, &B)) -> f64 {
+        let Some(first_set_ind) = board.first_set() else {
             return 0f64;
         };
-        let first = first_set_ind / W;
-        let last = game.last_set().unwrap_or(0) / W;
+        let first = first_set_ind / geom.width();
+        let last = board.last_set().unwrap_or(0) / geom.width();
         (last - first + 1) as f64
     }
 }
 
 pub struct PieceCount;
-impl<const W: usize, const H: usize, B: BitBoard> SinglePlayerInvariant<Konane256<W, H, B>>
-    for PieceCount
-{
-    fn compute(&self, game: B) -> f64 {
-        game.count_set() as f64
+impl<G: BoardGeometry, B: BitBoard> SinglePlayerInvariant<Konane<G, B>> for PieceCount {
+    fn compute(&self, (_, board): (&G, &B)) -> f64 {
+        board.count_set() as f64
     }
 }
 
 /// distance between the first and last column with at least one peice
 pub struct PieceWidth;
-impl<const W: usize, const H: usize, B: BitBoard> SinglePlayerInvariant<Konane256<W, H, B>>
-    for PieceWidth
-{
-    fn compute(&self, game: B) -> f64 {
+impl<G: BoardGeometry, B: BitBoard> SinglePlayerInvariant<Konane<G, B>> for PieceWidth {
+    fn compute(&self, (geom, board): (&G, &B)) -> f64 {
         let mut row_mask: B = B::empty();
-        for y in 0..H {
-            row_mask |= B::one() << (W * y);
+        for y in 0..geom.height() {
+            row_mask |= B::one() << (geom.width() * y);
         }
 
         let mut first_last = None;
-        for x in 0..W {
-            if row_mask.clone() & &game != B::empty() {
+        for x in 0..geom.width() {
+            if row_mask.clone() & board != B::empty() {
                 if let Some((_, last)) = &mut first_last {
                     *last = x;
                 } else {
@@ -161,36 +158,34 @@ impl<const W: usize, const H: usize, B: BitBoard> SinglePlayerInvariant<Konane25
     }
 }
 
-pub struct MoveCount<const W: usize, const H: usize, B: BitBoard, const IS_WHITE: bool>(
-    PhantomData<B>,
-);
+pub struct MoveCount<G: BoardGeometry, B: BitBoard, const IS_WHITE: bool>(PhantomData<(B, G)>);
 
-impl<const W: usize, const H: usize, B: BitBoard> MoveCount<W, H, B, false> {
+impl<G: BoardGeometry, B: BitBoard> MoveCount<G, B, false> {
     pub fn left() -> Self {
         Self(PhantomData)
     }
 }
 
-impl<const W: usize, const H: usize, B: BitBoard> MoveCount<W, H, B, true> {
+impl<G: BoardGeometry, B: BitBoard> MoveCount<G, B, true> {
     pub fn right() -> Self {
         Self(PhantomData)
     }
 }
-impl<const W: usize, const H: usize, B: BitBoard, const IS_WHITE: bool>
-    Invariant<Konane256<W, H, B>> for MoveCount<W, H, B, IS_WHITE>
+impl<G: BoardGeometry, B: BitBoard, const IS_WHITE: bool> Invariant<Konane<G, B>>
+    for MoveCount<G, B, IS_WHITE>
 {
-    fn compute(&self, game: Konane256<W, H, B>) -> f64 {
+    fn compute(&self, game: Konane<G, B>) -> f64 {
         let mut sum = 0;
 
-        let mut l = game.move_generator::<IS_WHITE, _>(Left);
-        let mut r = game.move_generator::<IS_WHITE, _>(Right);
-        let mut u = game.move_generator::<IS_WHITE, _>(Up);
-        let mut d = game.move_generator::<IS_WHITE, _>(Down);
+        let mut l = game.move_bitmap::<IS_WHITE, Left>();
+        let mut r = game.move_bitmap::<IS_WHITE, Right>();
+        let mut u = game.move_bitmap::<IS_WHITE, Up>();
+        let mut d = game.move_bitmap::<IS_WHITE, Down>();
         while !l.is_complete() || !r.is_complete() || !u.is_complete() || !d.is_complete() {
-            l.advance();
-            r.advance();
-            u.advance();
-            d.advance();
+            l.advance_against::<IS_WHITE, Left, G>(&game);
+            r.advance_against::<IS_WHITE, Right, G>(&game);
+            u.advance_against::<IS_WHITE, Up, G>(&game);
+            d.advance_against::<IS_WHITE, Up, G>(&game);
             sum += l.moves.count_set();
             sum += r.moves.count_set();
             sum += u.moves.count_set();
@@ -201,42 +196,49 @@ impl<const W: usize, const H: usize, B: BitBoard, const IS_WHITE: bool>
     }
 }
 
-pub struct CaptureCount<const W: usize, const H: usize, B: BitBoard, const IS_WHITE: bool>(
-    PhantomData<B>,
-);
+pub struct CaptureCount<G: BoardGeometry, B: BitBoard, const IS_WHITE: bool>(PhantomData<(B, G)>);
 
-impl<const W: usize, const H: usize, B: BitBoard> CaptureCount<W, H, B, false> {
+impl<G: BoardGeometry, B: BitBoard> CaptureCount<G, B, false> {
     pub fn left() -> Self {
         Self(PhantomData)
     }
 }
 
-impl<const W: usize, const H: usize, B: BitBoard> CaptureCount<W, H, B, true> {
+impl<G: BoardGeometry, B: BitBoard> CaptureCount<G, B, true> {
     pub fn right() -> Self {
         Self(PhantomData)
     }
 }
 
-impl<const W: usize, const H: usize, B: BitBoard, const IS_WHITE: bool>
-    Invariant<Konane256<W, H, B>> for CaptureCount<W, H, B, IS_WHITE>
+impl<G: BoardGeometry, B: BitBoard, const IS_WHITE: bool> Invariant<Konane<G, B>>
+    for CaptureCount<G, B, IS_WHITE>
 {
-    fn compute(&self, game: Konane256<W, H, B>) -> f64 {
-        let mut l = game.move_generator::<IS_WHITE, _>(Left);
-        let mut r = game.move_generator::<IS_WHITE, _>(Right);
-        let mut u = game.move_generator::<IS_WHITE, _>(Up);
-        let mut d = game.move_generator::<IS_WHITE, _>(Down);
+    fn compute(&self, game: Konane<G, B>) -> f64 {
+        let mut l = game.move_bitmap::<IS_WHITE, Left>();
+        let mut r = game.move_bitmap::<IS_WHITE, Right>();
+        let mut u = game.move_bitmap::<IS_WHITE, Up>();
+        let mut d = game.move_bitmap::<IS_WHITE, Down>();
 
         // game where we run all given moves for the current player
         let mut all_captured = game.clone();
         while !l.is_complete() || !r.is_complete() || !u.is_complete() || !d.is_complete() {
-            l.advance();
-            r.advance();
-            u.advance();
-            d.advance();
-            all_captured = l.move_iter().fold(all_captured, |c, m| m.apply(c));
-            all_captured = r.move_iter().fold(all_captured, |c, m| m.apply(c));
-            all_captured = u.move_iter().fold(all_captured, |c, m| m.apply(c));
-            all_captured = d.move_iter().fold(all_captured, |c, m| m.apply(c));
+            l.advance_against::<IS_WHITE, Left, G>(&game);
+            r.advance_against::<IS_WHITE, Right, G>(&game);
+            u.advance_against::<IS_WHITE, Up, G>(&game);
+            d.advance_against::<IS_WHITE, Up, G>(&game);
+
+            for new_pos in l.moves.iter_set() {
+                l.apply_move_to_mut::<IS_WHITE, G, Left>(&mut all_captured, new_pos);
+            }
+            for new_pos in r.moves.iter_set() {
+                l.apply_move_to_mut::<IS_WHITE, G, Right>(&mut all_captured, new_pos);
+            }
+            for new_pos in u.moves.iter_set() {
+                l.apply_move_to_mut::<IS_WHITE, G, Up>(&mut all_captured, new_pos);
+            }
+            for new_pos in d.moves.iter_set() {
+                l.apply_move_to_mut::<IS_WHITE, G, Down>(&mut all_captured, new_pos);
+            }
         }
 
         let capture_count = if IS_WHITE {
