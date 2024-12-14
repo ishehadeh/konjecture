@@ -90,6 +90,8 @@ futhermore, conisder the game in @fig-borken-stair, this is the result of white 
     __")
 ]<fig-borken-stair1>])
 
+#include "partials/05-stair-pen.typ"
+
 = Remaining Facts
 
 Below are incomplete sections I would like to add for the final draft.
