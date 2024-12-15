@@ -3,7 +3,7 @@
 = Conjecturing
 
 Conjecturing (@larsonAutomatedConjecturingFajtlowiczs2016)
-is a projectthat generates a series of true iequalities based on a table of objects with associated _invariants_.
+is a project that generates a series of true inequalities based on a table of objects with associated _invariants_.
 In our case, an object is a single Konane position, and invariants include things like _number of moves_, _number of black pieces_, _number of white pieces_, etc.
 
 #figure(caption: "Conjecturing Inputs")[
