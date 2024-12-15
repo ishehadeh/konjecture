@@ -1,5 +1,5 @@
 #import "../util/konane.typ": konane
-
+#import "../util/theorems.typ": theorem
 = Known Facts
 
 This section is a list of known facts about the game that informed our analysis.
@@ -22,22 +22,26 @@ The base case is $l_2 = 7$, $c_2 = 6$. @santosKonaneHasInfinite2008
 A solid linear pattern is series of $N$ alternating white and black pieces, with jumps allowed on either side.
 #figure(caption: $N = 7$, konane("_xoxoxox_"))
 
-The normal form for any solid linear pattern is:
+#theorem(name: "Outcome of Solid Linear Pattern")[
+  For a solid linear pattern with $N$ stones, the outcome class can be found by the function:
 
-$
--j &"  if " N = 2j + 1\
-0 &"  if " N = 4j\
-* &"  if " N = 4j + 2
-$
+  $
+    "SLP"(N) = cases(
+      -j &"  if " N = 2j + 1,
+      space space 0 &"  if " N = 4j,
+      space * &"  if " N = 4j + 2
+    ) 
+  $
+]<slp-outcome>
 
 Source: Ernst, _Playing Konane Mathematically_ @ernstPlayingKonaneMathematically1995
 
 == Solid Linear Pattern With Tail
 
 We say a solid linear pattern has a tail of length $M$, if there are $M$ alternating pieces below the left-most piece in the solid linear pattern.
-#figure(caption: [Linear with Tail $N = 7, M = 2$], konane("\n_oxoxoxo_\n_x\n_o\n"))
+#figure(caption: [Linear with Tail $N = 7, M = 2$], konane("_\n_oxoxoxo_\n_x\n_o\n_"))
 
-=== Tail Length 1
+
 
 Given a solid linear pattern of length $N$ with a tail of length $1$, the normal form is
 

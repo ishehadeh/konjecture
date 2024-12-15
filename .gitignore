@@ -5,3 +5,4 @@
 .venv/
 .ipynb_checkpoints/
 sage/
+.github/styles
