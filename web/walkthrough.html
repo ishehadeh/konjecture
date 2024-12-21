@@ -1,0 +1,2112 @@
+<!DOCTYPE html>
+<html lang="en-US">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>Konane</title>
+
+    <script type="text/javascript" name="Konane Utilities">
+        // Script: Utilities
+        //  These are mostly type-checking functions
+
+        /** Verify that `n` is a bigint or number, cast n to BigInt and copy it
+         * 
+         * @param {any} n
+         * @param {string} name  how the value (n) is referenced in errors
+         * @throws {TypeError}
+         * @returns bigint
+         */
+        function requireInteger(n, name = "value") {
+            if (typeof n != "number" && typeof n != "bigint") {
+                throw new TypeError(`expected ${name} to be numeric, got ${n}`)
+            }
+            if (typeof n == "number" && !Number.isInteger(n)) {
+                throw new TypeError(`expected ${name} to be an integer, got ${n}`)
+            }
+
+            return Object.freeze(BigInt(n));
+        }
+
+        /**
+         * @typedef {"black" | "white" | "empty"} TileState
+         */
+
+
+        /** Verify that `state` is a valid tile state string or number
+         * 
+         * @param {any} state
+         * @throws {TypeError}
+         * @returns {TileState}
+         */
+        function requireStateString(state) {
+            switch (state) {
+                case 0n:
+                case 0:
+                case "empty":
+                    return "empty"
+                case 1n:
+                case 1:
+                case "black":
+                    return "black"
+                case 2n:
+                case 2:
+                case "white":
+                    return "white"
+                default:
+                    throw new TypeError(`expected tile state to be "empty", "black", "white" (or equivalently 0, 1, 2), but got '${state}'`)
+            }
+        }
+
+
+        /** Compare two BigInts
+         * 
+         * @param {bigint} lhs
+         * @param {bigint} rhs
+         * @returns {Ordering}
+         */
+        function compareBigInt(lhs, rhs) {
+            if (lhs < rhs) {
+                return -1;
+            } else if (lhs > rhs) {
+                return 1;
+            } else {
+                return 0;
+            }
+        }
+
+        /** Take the absolute value of a BigInt
+         * @param {bigint} value
+         * @return {bigint}
+         */
+        function absBigInt(value) {
+            if (value < 0) { return value * -1n }
+            else { return value }
+        }
+
+        /** Get the first power of two <= n
+         * @param {bigint} n
+         * @returns {bigint}
+         */
+        function powerOfTwoLessOrEqual(n) {
+            let bit = 1n;
+            while ((bit ^ n) != 0) {
+                n &= ~bit;
+                bit <<= 1n;
+            }
+            return n
+        }
+
+        /** Get the first power of two < n
+         * @param {bigint} n
+         * @returns {bigint}
+         */
+        function powerOfTwoLess(n) {
+            let bit = 1n;
+            while (bit < n) {
+                bit *= 2n;
+            }
+            bit /= 2n;
+            return bit;
+        }
+    </script>
+
+
+    <script type="text/javascript" id="Combinatorial Game Theory Primitives">
+        /** 
+         * @typdef {-1 | 0 | 1} Ordering
+         * @typdef {Ordering | null} PartialOrdering
+         */
+
+        /** Marks child classes as partially (optionally) comparable
+         * @interface
+         */
+        class PartialOrder {
+            /** 
+             * @returns {PartialOrdering}
+             * @abstract
+             */
+            partialCompare(rhs) {
+                throw Error("Not Implemented: Order.partialCompare");
+            }
+        }
+
+
+        /** Marks child classes as comparable. 
+         * @interface
+         * @implements {PartialOrder}
+         */
+        class Order extends PartialOrder {
+            /** Returns -1 if `this < rhs`, 1 if `this > rhs` or 0 if `this == rhs`.
+             *  Implementing this interface implies that any two object's of the implementor's
+             *  type fall into one of the above cases (<, >, or ==).
+             * 
+             *  @returns {Order}
+             *  @abstract
+             */
+            compare(rhs) {
+                throw Error("Not Implement: Order.compare");
+            }
+
+            partialCompare(rhs) {
+                return this.compare(rhs)
+            }
+        }
+
+        class CanonicalForm extends PartialOrder {
+            /** @type {CanonicalForm[]} */
+            get leftMoves() { throw new Error("Not Implemented"); }
+            /** @type {CanonicalForm[]} */
+            get rightMoves() { throw new Error("Not Implemented"); }
+
+            /** @returns {DyadicRational | null} */
+            asNumber() { throw new Error("Not Implemented"); }
+            /** @returns {bigint | null} */
+            asNimber() { throw new Error("Not Implemented"); }
+
+            /** @returns {DyadicRational} */
+            leftStop() {
+                const num = this.asNumber();
+                if (num != null) { return num; }
+                // Lessons in Play, Definition 6.9:
+                //  LS(G) = G              if G is a number,
+                //        | max(RS(Gᴸ))    otherwise
+
+                /** @type {DyadicRational | null} */
+                let max = null;
+
+                for (const l of this.leftMoves) {
+                    const lRS = l.rightStop();
+                    if (max == null || max.compare(lRS) == -1) {
+                        max = l;
+                    }
+                }
+                return max;
+            }
+
+            /** @returns {DyadicRational} */
+            rightStop() {
+                const num = this.asNumber();
+                if (num != null) { return num; }
+                // Lessons in Play, Definition 6.9:
+                //  RS(G) = G              if G is a number,
+                //        | max(LS(Gᴿ))    otherwise
+
+                /** @type {DyadicRational | null} */
+                let min = null;
+
+                for (const r of this.rightMoves) {
+                    const rLS = r.leftStop();
+                    if (min == null || min.compare(rLS) == 1) {
+                        min = r;
+                    }
+                }
+                return min;
+            }
+
+
+            /** 
+             * @param {CanonicalForm} rhs
+             * @returns {PartialOrdering}
+             */
+            partialCompare(rhs) {
+                // TEMPERATURE THEORY AND THE THERMOSTATIC STRATEGY, Karen Ye
+                // https://www.math.uchicago.edu/~may/VIGRE/VIGRE2009/REUPapers/Ye.pdf
+                // Definition 2.3: An equivalent definition of inequality is that G ≥ H if and only
+                // if there is no option Hᴸ such that Hᴸ ≥ G and there is no option Gᴿ such that
+                // Gᴿ ≤ H
+                const rhsL = rhs.leftMoves;
+                const rhsR = rhs.rightMoves;
+                const lhsL = this.leftMoves;
+                const lhsR = this.rightMoves;
+
+                let exact = rhsL.length > 0 || lhsR.length > 0;
+                // Check: "no option Hᴸ such that Hᴸ ≥ G"
+                for (const hL of rhsL) {
+                    if (hL.partialCompare(this) >= 0) {
+                        return -1;
+                    }
+
+                    if (exact) {
+                        let hasMatch = false
+                        for (const gL of lhsL) {
+                            if (gL.partialCompare(hL) == 0) {
+                                hasMatch = true;
+                                break;
+                            }
+                        }
+                        exact = hasMatch;
+                    }
+                }
+
+                // Check: " no option Gᴿ such that Gᴿ ≤ H"
+                for (const gR of lhsR) {
+                    if (gR.partialCompare(rhs) <= 0) {
+                        return -1;
+                    }
+
+                    if (exact) {
+                        let hasMatch = false
+                        for (const hR of rhsR) {
+                            if (hR.partialCompare(gR) == 0) {
+                                hasMatch = true;
+                                break;
+                            }
+                        }
+                        exact = hasMatch;
+                    }
+                }
+
+                if (exact) {
+                    return 0;
+                } else {
+                    return 1;
+                }
+            }
+        }
+
+        /** A rational in the form m/(2^n), where m is an integer, and n is an integer >= 0
+         * 
+         * @implements {Order}
+         */
+        class DyadicRational {
+            /** the "m" in m/(2^n)
+             * @type {bigint}
+             */
+            #numerator
+
+            /** the "n" in m/(2^n)
+             * INVARIANT: #denominatorExp >= 0
+             * @type {bigint}
+             */
+            #denominatorExp
+
+            /**
+             * 
+             * @param {bigint | number} numerator
+             * @param {bigint | number} denominatorExp must be greater than or equal to zero
+             */
+            constructor(numerator, denominatorExp = 0n) {
+                this.#numerator = requireInteger(numerator);
+                this.#denominatorExp = requireInteger(denominatorExp);
+                if (this.#denominatorExp < 0n) {
+                    throw new Error(`invalid dyadic rational (${this}): denominator must be greater than or equal to zero.`);
+                }
+                this.normalize();
+            }
+
+            /** Construct a Dyadic Rational from a string, bigint, or number
+             *
+             * @param {string | number | bigint | boolean} value
+             * @returns {DyadicRational}
+             * @throws {TypeError}
+             */
+            static from(value) {
+                if (value instanceof DyadicRational) {
+                    return new DyadicRational(value.numerator, value.denominatorExp);
+                }
+
+                switch (typeof value) {
+                    case "bigint":
+                        return new DyadicRational(value);
+                    case "boolean":
+                        return new DyadicRational(value ? 1n : 0n);
+                    case "number":
+                        return new DyadicRational(value);
+                    case "string":
+                        return new DyadicRational(BigInt(value))
+                    default:
+                        throw new TypeError(`cannot coerce value "${value}" to a DyadicRational`);
+                }
+            }
+
+            get numerator() { return this.#numerator; }
+            // get denominator() { return 2n ** this.denominatorExp; }
+            get denominatorExp() { return this.#denominatorExp; }
+
+            toString() {
+                if (this.denominatorExp == 0n) {
+                    return this.numerator.toString();
+                } else {
+                    return `${this.numerator}/(2^${this.denominatorExp})`;
+                }
+            }
+
+            clone() {
+                return DyadicRational.from(this);
+            }
+
+            compare(rhs) {
+                const coercedRhs = DyadicRational.from(rhs);
+
+                // normalize first so we can compare denominators
+                this.normalize();
+
+                if (this.numerator != 0n && coercedRhs.numerator != 0n) {
+                    if (this.denominatorExp < coercedRhs.denominatorExp) {
+                        return 1;
+                    } else if (this.denominatorExp > coercedRhs.denominatorExp) {
+                        return -1;
+                    }
+                }
+
+                if (this.numerator < coercedRhs.numerator) {
+                    return -1;
+                } else if (this.numerator > coercedRhs.numerator) {
+                    return 1;
+                } else {
+                    return 0;
+                }
+            }
+
+            #increaseDenom(denomExp) {
+                const denomExpBig = requireInteger(denomExp);
+                if (this.#denominatorExp > denomExpBig) {
+                    throw new Error(`denomator must be increased! new dominator is '${denomExpBig}', but value is ${this}`)
+                }
+                const diff = denomExpBig - this.denominatorExp;
+                this.#numerator *= (2n ** diff);
+                this.#denominatorExp = denomExpBig;
+            }
+
+            /** Simplify the fraction, this operation should be run after construction, or any arithmetic.
+             */
+            normalize() {
+                while (this.#denominatorExp > 0n && (this.#numerator % 2n) == 0n) {
+                    this.#denominatorExp -= 1n;
+                    this.#numerator /= 2n;
+                }
+            }
+
+            neg() {
+                this.#numerator *= -1n;
+            }
+
+            /** shorthand to check if the numerator is zero
+             *  @returns {boolean}
+             */
+            isZero() {
+                return this.numerator == 0n;
+            }
+
+            /** Get the right options
+             * @return {DyadicRational | null}
+             */
+            right() {
+                // 2 cases here
+                //  1. This is a whole number, so N = {|N + 1} or N = {N - 1|}, or N = 0
+                if (this.denominatorExp === 0n) {
+                    // if the number is < 0 then only right has options
+                    if (this.numerator < 0n) {
+                        return new DyadicRational(this.numerator + 1n, 0n);
+                    } else {
+                        // right has no options if N >= 0
+                        return null;
+                    }
+                }
+
+                // 2. this is a fraction, so (2p + 1)/(2^m+1) = {p/(2^m) | (p + 1)/(2^m)}
+                // Ref: https://mathstrek.blog/2012/08/15/combinatorial-game-theory-vii/, "More Fractions"
+                return new DyadicRational((this.numerator - 1n) / 2n + 1n, this.denominatorExp - 1n);
+            }
+
+            /** Get the left options
+             * @return {DyadicRational | null}
+             */
+            left() {
+                // 2 cases here
+                //  1. This is a whole number, so N = {|N + 1} or N = {N - 1|}, or N = 0
+                if (this.denominatorExp === 0n) {
+                    // if the number is > 0 then only left has options
+                    if (this.numerator > 0n) {
+                        return new DyadicRational(this.numerator - 1n, 0n);
+                    } else {
+                        // left has no options if N <= 0
+                        return null;
+                    }
+                }
+
+                // 2. this is a fraction, so (2p + 1)/(2^m+1) = {p/(2^m) | (p + 1)/(2^m)}
+                // Ref: https://mathstrek.blog/2012/08/15/combinatorial-game-theory-vii/, "More Fractions"
+                return new DyadicRational((this.numerator - 1n) / 2n, this.denominatorExp - 1n);
+            }
+
+            /** Add rhs to this rational
+             * 
+             * @param {DyadicRational} rhs
+             * @returns {void}
+             */
+            add(rhs) {
+                // make sure we match denominators
+                let compatRhs = DyadicRational.from(rhs);
+                if (compatRhs.denominatorExp < this.denominatorExp) {
+                    compatRhs = compatRhs.clone();
+                    compatRhs.#increaseDenom(this.denominatorExp);
+                } else if (compatRhs.denominatorExp > this.denominatorExp) {
+                    this.#increaseDenom(compatRhs.denominatorExp);
+                }
+
+                this.#numerator += compatRhs.numerator
+                this.normalize();
+            }
+
+            sub(rhs) {
+                const rhsRat = DyadicRational.from(rhs);
+                rhsRat.neg();
+                this.add(rhsRat);
+            }
+
+            mul(rhs) {
+                const rhsRat = DyadicRational.from(rhs);
+                this.#numerator *= rhsRat.numerator;
+                this.#denominatorExp += rhsRat.denominatorExp;
+                this.normalize();
+            }
+        }
+
+        /** Sum of a dyadic rational number m/(2^n), an positive or negative infinitesimal (up), and a Nimber (star)
+         * @prop {bigint} up
+         * @prop {bigint} star
+         * @prop {DyadicRational} number
+         */
+        class NumberUpStar extends CanonicalForm {
+            #number
+            #up
+            #star
+
+            // expose properties as get-only
+            // we'll handle any mutation to avoid invalid states.
+
+            get number() { return this.#number }
+            get up() { return this.#up }
+            get star() { return this.#star }
+
+            get leftMoves() {
+                return [...this.generateLeftOptions()]
+            }
+            get rightMoves() {
+                return [...this.generateRightOptions()]
+            }
+
+            constructor(number = 0n, up = 0n, star = 0n) {
+                super();
+
+                this.#number = DyadicRational.from(number);
+                this.#up = requireInteger(up, "up component");
+                this.#star = requireInteger(star, "nimber");
+                if (this.#star < 0) {
+                    throw new Error(`invalid NumberUpStar (${this}): star must be greater than or equal to zero.`);
+
+                }
+            }
+
+            /** Try to coerce an arbirary value into a NumberUpStar
+             * 
+             * @param {any} value
+             * @returns {NumberUpStar}
+             * @throws {TypeError}
+             */
+            static coerce(value) {
+                if (value instanceof DyadicRational) {
+                    return new NumberUpStar(value)
+                } else if (value instanceof NumberUpStar) {
+                    return value;
+                }
+                if (typeof value == "object" && value != null && value != undefined) {
+                    for (const key of Object.keys(value)) {
+                        if (!["n", "u", "s", "number", "up", "star"].includes(key)) {
+                            throw new TypeError("Object keys must be one of 'number', 'up', or 'star' (or 'n', 'u', 's' for short). recieved: " + JSON.stringify(value));
+                        }
+                    }
+                    const number = value["number"] ?? value["n"];
+                    const up = value["up"] ?? value["u"];
+                    const star = value["star"] ?? value["s"];
+                    return new NumberUpStar(DyadicRational.from(number ?? 0), up, star)
+                }
+
+                switch (typeof value) {
+                    case "bigint":
+                    case "number":
+                    case "boolean":
+                        return new NumberUpStar(DyadicRational.from(value));
+                    default:
+                        throw new TypeError(`cannot coerce NumberUpStar from '${value}' (typeof value = ${typeof value})`);
+                }
+            }
+
+            partialCompare(rhsRaw) {
+                if (rhsRaw instanceof MoveSet) {
+                    const nus = rhsRaw.asNus();
+                    if (nus == null) {
+                        return super.partialCompare(rhsRaw);
+                    } else {
+                        rhsRaw = nus;
+                    }
+                }
+
+                // source: Lessons In Play, Observation 5.41, pg. 101.
+                const rhs = NumberUpStar.coerce(rhsRaw);
+                const numCmp = this.number.compare(rhs.number);
+                const upCmp = compareBigInt(this.up, rhs.up);
+                const starCmp = compareBigInt(this.star, rhs.star);
+
+                // equality is easy...
+                if (numCmp == 0 && upCmp == 0 && starCmp == 0) {
+                    return 0;
+                }
+
+                // numbers take precedence over infinitesimals
+                if (numCmp != 0) {
+                    // for any positive number x:
+                    //  1) -x < ^ < x
+                    //  2) -x < -^ < x
+                    //  3) -x < * < x
+                    // so if either number is non-zero (implies by them not being equal)
+                    // the difference between the numbers will overpower infinitesimals
+                    return numCmp
+                }
+
+
+                // +/-^ is incomparable with *
+                if (absBigInt(this.up) == 1n && rhs.up == 0n && rhs.star != 0n) {
+                    return null
+                }
+                if (absBigInt(rhs.up) == 1n && this.up == 0n && this.star != 0n) {
+                    return null
+                }
+
+                // everything is equal except (maybe) star, so these values are incomparable
+                if (upCmp == 0) {
+                    return null
+                } else {
+                    // with the exception of +/-^1, up overrules star
+                    return upCmp
+                }
+            }
+
+            /** If the up and star components are zero return a DyadicRational, otherwise return null
+             * @returns {DyadicRational | null}
+             */
+            asNumber() {
+                if (this.up == 0n && this.star == 0n) {
+                    return this.number
+                } else {
+                    return null;
+                }
+            }
+
+            /** If the niumber and up components are zero return the star component, otherwise return null
+             * @returns {bigint | null}
+             */
+            asNimber() {
+                if (this.up == 0n && this.number == 0n) {
+                    return this.star
+                } else {
+                    return null;
+                }
+            }
+
+            *generateRightOptions() {
+                const numRight = this.number.right();
+                const upRight = this.up > 0 ? new NumberUpStar(0, this.up - 1n, 1) : (this.up < 0 ? NumberUpStar.coerce(0n) : null);
+                // player moves on number:
+                if (numRight != null) {
+                    yield new NumberUpStar(numRight, this.up, this.star);
+                }
+
+                // player moves on up game
+                if (upRight) {
+                    yield upRight;
+                }
+
+                // player moves on star game
+                if (this.star != 0n) {
+                    for (let i = 0n; i < this.star; ++i) {
+                        yield new NumberUpStar(this.number, this.up)
+                    }
+                }
+            }
+
+            *generateLeftOptions() {
+                const numLeft = this.number.left();
+                const upLeft = this.up < 0 ? new NumberUpStar(0, this.up + 1n, 1) : (this.up > 0 ? NumberUpStar.coerce(0n) : null);
+
+                // player moves on number:
+                if (numLeft != null) {
+                    yield new NumberUpStar(numLeft, this.up, this.star);
+                }
+
+                // player moves on up game
+                if (upLeft) {
+                    yield upLeft;
+                }
+
+                // player moves on star game
+                if (this.star != 0n) {
+                    for (let i = 0n; i < this.star; ++i) {
+                        yield new NumberUpStar(this.number, this.up)
+                    }
+                }
+            }
+
+            toString() {
+                if (this.number == 0n && this.up == 0n && this.star == 0n) {
+                    return "0";
+                }
+                let str = "";
+                if (!this.number.isZero()) {
+                    str += this.number.toString();
+                }
+                if (this.up != 0n) {
+                    if (str) { str += " + " }
+                    if (this.up != 1n && this.up != -1n) {
+                        str += this.up.toString();
+                    } else if (this.up == -1n) {
+                        str += "-"
+                    }
+                    str += "^";
+                }
+                if (this.star != 0n) {
+                    if (str) { str += " + " }
+                    str += "*"
+                    if (this.star != 1) {
+                        str += this.star.toString();
+                    }
+                }
+                return str;
+            }
+        }
+
+        /** A list of left and right player moves
+         * @implements {PartialOrder}
+         */
+        class MoveSet extends CanonicalForm {
+            left;
+            right;
+
+            /**
+             * @param {(MoveSet | NumberUpStar)[]} left
+             * @param {(MoveSet | NumberUpStar)[]} right
+             */
+            constructor(left, right) {
+                super();
+
+                this.left = left;
+                this.right = right;
+            }
+
+            clone() {
+                return new MoveSet([...this.leftMoves], [...this.rightMoves]);
+            }
+
+            /** Returns true if neither player has any options
+             * @returns {boolean}
+             */
+            isZero() {
+                return this.left.length == 0 && this.right.length == 0;
+            }
+
+            /** Bypass reversible moves for the left player
+             */
+            bypassReversibleL() {
+                for (let i = 0; i < this.left.length; ++i) {
+                    for (const lR of this.left[i].rightMoves) {
+                        if (lR.partialCompare(this) <= 0) {
+                            let moves = [...lR.leftMoves];
+                            if (moves.length > 0) {
+                                this.left[i] = moves[0];
+                                if (moves.length > 1) {
+                                    this.left.push(...moves.slice(1));
+                                }
+                            } else {
+                                this.left.splice(i, 1);
+                                i -= 1;
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            toString() {
+                let str = "{ ";
+                for (const l in this.left) {
+                    str += this.left[l].toString();
+                    if (l == this.left.length - 1) {
+                        if (this.right.length == 0) {
+                            str += "| }"
+                        } else {
+                            str += " | "
+                        }
+                    } else {
+                        str += ", "
+                    }
+                }
+                if (this.left.length == 0) {
+                    str += "| ";
+                }
+
+                for (const r in this.right) {
+                    str += this.right[r].toString();
+                    if (r == this.right.length - 1) {
+                        str += " }"
+                    } else {
+                        str += ", "
+                    }
+                }
+                return str;
+            }
+
+
+            /** Bypass reversible moves for the right player
+             */
+            bypassReversibleR() {
+                for (let i = 0; i < this.right.length; ++i) {
+                    for (const rL of this.right[i].leftMoves) {
+                        if (rL.partialCompare(this) >= 0) {
+                            let moves = [...rL.rightMoves];
+                            if (moves.length > 0) {
+                                this.right[i] = moves[0];
+                                if (moves.length > 1) {
+                                    this.right.push(...moves.slice(1));
+                                }
+                            } else {
+                                this.right.splice(i, 1);
+                                i -= 1;
+                            }
+                            break;
+                        }
+                    }
+                }
+            }
+
+            /** Remove dominated moves from a single side.
+             * @param {boolean} left  true to remove dominated left moves, false to remove dominated right moves
+             */
+            removeDominatedMoves(left) {
+                const moves = [];
+                const existingMoves = left ? this.left : this.right;
+                if (existingMoves.length == 1) {
+                    return;
+                }
+
+                for (const m of existingMoves) {
+                    let insert = true;
+                    for (const i in moves) {
+                        const cmp = m.partialCompare(moves[i]);
+                        if (cmp != null) {
+                            // since we have some ordering with an existing move
+                            // there's no need to add this one.
+                            insert = false;
+
+                            if (cmp == 0 || (left && cmp == -1) || (!left && cmp == 1)) {
+                                // skip moves which already have a better move in the list
+                                break;
+                            } else {
+                                // this move is better than the existing move so add it
+                                moves[i] = m;
+                                break;
+                            }
+                        }
+                    }
+                    if (insert) {
+                        moves.push(m);
+                    }
+                }
+
+                if (left) {
+                    this.left = moves;
+                } else {
+                    this.right = moves;
+                }
+            }
+
+            get leftMoves() {
+                return this.left;
+            }
+            get rightMoves() {
+                return this.right;
+            }
+
+            normalize() {
+                this.removeDominatedMoves(true);
+                this.removeDominatedMoves(false);
+
+                this.bypassReversibleL();
+                this.bypassReversibleR();
+
+                return this.asNus() ?? this;
+            }
+
+            asNus() {
+                const num = this.asNumber();
+                if (num) {
+                    return new NumberUpStar(num);
+                }
+                const up = this.asUpStar() ?? this.asUp();
+                if (up) {
+                    return up;
+                }
+
+                if (this.isImpartial()) {
+                    if (this.leftMoves.length == 1) {
+                        const number = this.leftMoves[0].asNumber();
+                        if (number != null) {
+                            return new NumberUpStar(number, 0, 1)
+                        }
+                    }
+                    let nimbers = null;
+                    for (const l of this.leftMoves) {
+                        const nimber = l.asNimber();
+                        if (nimber == null) {
+                            nimbers = null;
+                            break;
+                        } else {
+                            if (nimbers == null) {
+                                nimbers = new Set([nimber])
+                            } else {
+                                nimbers.add(nimber);
+                            }
+                        }
+                    }
+                    if (nimbers != null) {
+                        let mex = 0n;
+                        while (nimbers.has(mex)) {
+                            mex += 1n;
+                        }
+                        return new NumberUpStar(0, 0, mex)
+                    }
+                }
+                return null;
+            }
+
+            /** Check if left == right
+             * @returns {boolean}
+             */
+            isImpartial() {
+                for (const gL of this.leftMoves) {
+                    let found = false;
+                    for (const gR of this.rightMoves) {
+                        if (gR.partialCompare(gL) == 0) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (found == false) return false;
+                }
+                return true;
+            }
+
+            /** Try to conver this into a NumberUpStar where up and star are equal to 1 
+             * i.e. return n + ^ +  * if {n,n*|n} or n + -^ + * if {n|n,n*}
+             */
+            asUpStar() {
+                let a1, a2;
+                let b1;
+                let star;
+
+                if (this.left.length == 2 && this.right.length == 1) {
+                    [a1, a2] = this.left;
+                    [b1] = this.right;
+                    star = 1n;
+                } else if (this.left.length == 1 && this.right.length == 2) {
+                    [a1, a2] = this.right;
+                    [b1] = this.left;
+                    star = -1n
+                }
+
+
+                if (a1 instanceof NumberUpStar && a2 instanceof NumberUpStar && b1 instanceof NumberUpStar) {
+                    if (a1.number == a2.number && b1.number == a1.number && b1.up == 0n && a1.up == 0n && l2.up == 0n) {
+                        if ((a1.star == 0n && a2.star == 1n) || (a2.star == 0n && a1.star == 1n)) {
+                            return new NumberUpStar(a1.number, star, 1n);
+                        }
+                    }
+                }
+
+                return null;
+            }
+
+            /** returns a NumberUpStar if the game is in the form {0|G}, if G is a NumberUpStar with up > 0 or {G|0} if up < 0
+             *  or returns ^ if the game is {0|*} or -^ if the game is {*|0}
+             */
+            asUp() {
+                if (this.left.length == 1 && this.right.length == 1) {
+                    let [l] = this.left;
+                    let [r] = this.right;
+                    if (l instanceof NumberUpStar && r instanceof NumberUpStar) {
+                        if (l.number.isZero() && (r.up > 0n || r.star > 0n)) {
+                            return new NumberUpStar(r.number, r.up + 1n, r.star ^ 1n)
+                        }
+                        if (r.number.isZero() && (l.up < 0n || r.star > 0n)) {
+                            return new NumberUpStar(r.number, r.up - 1n, r.star ^ 1n)
+                        }
+                    }
+                }
+            }
+
+            /**
+             * @returns {DyadicRational | null}
+             */
+            asNumber() {
+                let leftMax = null;
+                let rightMin = null;
+                for (const l of this.leftMoves) {
+                    let lNum = l.asNumber();
+                    if (lNum == null) {
+                        return null
+                    }
+                    if (leftMax == null || leftMax.compare(lNum) == -1) {
+                        leftMax = lNum;
+                    }
+                }
+                for (const r of this.rightMoves) {
+                    let rNum = r.asNumber();
+                    if (rNum == null) {
+                        return null
+                    }
+                    if (rightMin == null || rightMin.compare(rNum) == 1) {
+                        rightMin = rNum;
+                    }
+                }
+
+
+                // handle no options for left or right player
+                if (leftMax == null && rightMin == null) {
+                    return new DyadicRational(0);
+                } else if (rightMin == null) {
+                    if (leftMax.numerator < 0) {
+                        return new DyadicRational(0)
+                    } else {
+                        const result = leftMax.clone();
+                        result.add(1);
+                        return result;
+                    }
+                } else if (leftMax == null) {
+                    if (rightMin.numerator > 0) {
+                        return new DyadicRational(0)
+                    } else {
+                        const result = rightMin.clone();
+                        result.sub(1);
+                        return result;
+                    }
+                }
+
+                if (leftMax.compare(rightMin) != -1) {
+                    return null;
+                }
+
+                // 1 (easy case) the simplest number is zero
+                // Source: https://mathstrek.blog/2012/08/15/combinatorial-game-theory-vii/, "Simplicity Rule"
+                if (leftMax.numerator < 0 && rightMin.numerator > 0) {
+                    return new DyadicRational(0);
+                }
+
+                // 2: try to find the smallest denominator
+                let dist = rightMin.clone();
+                let endpointOffset;
+                dist.sub(leftMax);
+                if (dist.numerator == 1) {
+                    // forced to split the rational number
+                    endpointOffset = new DyadicRational(1n, dist.denominatorExp + 1n);
+                } else {
+                    endpointOffset = new DyadicRational(powerOfTwoLess(dist), dist.denominatorExp);
+                }
+
+                if (rightMin.numerator < 0) {
+                    const result = rightMin.clone();
+                    result.sub(endpointOffset);
+                    return result
+                } else {
+                    const result = leftMax.clone();
+                    result.add(endpointOffset);
+                    return result;
+                }
+            }
+        }
+
+        function canonicalForm(left, right) {
+            const canonLeft = [];
+            const canonRight = [];
+            for (const l of left) {
+                if (l instanceof MoveSet) {
+                    canonLeft.push(l.normalize());
+                } else {
+                    canonLeft.push(NumberUpStar.coerce(l))
+                }
+            }
+
+            for (const r of right) {
+                if (r instanceof MoveSet) {
+                    canonRight.push(r.normalize());
+                } else {
+                    canonRight.push(NumberUpStar.coerce(r))
+                }
+            }
+
+            return (new MoveSet(canonLeft, canonRight)).normalize();
+        }
+    </script>
+
+    <script type="text/javascript" id="Konane Mechanics">
+
+        class KonaneMove {
+            #fromX;
+            #fromY;
+            #toY;
+            #toX;
+
+            constructor(fromX, fromY, toX, toY) {
+                this.#fromX = requireInteger(fromX);
+                this.#fromY = requireInteger(fromY);
+                this.#toX = requireInteger(toX);
+                this.#toY = requireInteger(toY);
+
+                if (this.fromX != this.toX && this.fromY != this.toY) {
+                    throw new Error(`moves must be either horizontal or vertical, cannot move from <${this.fromX}, ${this.fromY}> to <${this.toX}, ${this.toY}>`)
+                }
+                if (this.fromX == this.toX && this.fromY == this.toY) {
+                    throw new Error(`move has no effect! move from <${this.fromX}, ${this.fromY}> to <${this.toX}, ${this.toY}>`)
+                }
+            }
+
+            get fromX() { return this.#fromX }
+            get fromY() { return this.#fromY }
+            get toX() { return this.#toX }
+            get toY() { return this.#toY }
+
+            *clearedCells() {
+                let xDiff = 0n;
+                let yDiff = 0n;
+                if (this.fromX == this.toX) {
+                    yDiff = this.fromY > this.toY ? -1n : 1n
+                } else {
+                    xDiff = this.fromX > this.toX ? -1n : 1n
+                }
+
+                let x = this.fromX;
+                let y = this.fromY;
+                while (x != this.toX || y != this.toY) {
+                    yield { x, y };
+
+                    x += xDiff;
+                    y += yDiff;
+                }
+            }
+        }
+
+        class KonaneMoveGenerator {
+            /**
+             * @param {Konane} game
+             * @param {"black" | "white"} player
+             */
+            constructor(game, player) {
+                if (!(game instanceof Konane)) {
+                    throw new TypeError(`expected 'game' to be an instance of Konane, got '${game}'`);
+                }
+                if (player != "black" && player != "white") {
+                    throw new TypeError(`expected player to be "black" or "white", got '${player}`);
+                }
+
+                this._game = game;
+                this._player = player;
+                this._setDir(0);
+            }
+
+            static empty(game) {
+                const gen = new KonaneMoveGenerator(game, "black");
+                gen._setDir(4);
+                return gen;
+            }
+
+            /** Reset the move list, future advances will be in the given direction
+             * 
+             * @param {0 | 1 | 2 | 3} border the border 0 = "left", 1 = "right", 2 = "down", 3 = "up"
+             * @returns {void}
+             */
+            _setDir(dir) {
+                this._dir = dir;
+                if (this._dir == 4) {
+                    // dir 4 marks the end of the generator
+                    return;
+                }
+
+                this._hops = 0n;
+                this._moveList = this._player == "black" ? this._game._black : this._game._white;
+                this._moveList &= ~this._game._borderMask(dir);
+                this.hop();
+            }
+
+            /** shift the move list over in the current direction
+             * @access private
+             */
+            _shift() {
+                switch (this._dir) {
+                    case 0:
+                        this._moveList >>= 1n;
+                        break;
+                    case 1:
+                        this._moveList <<= 1n;
+                        this._moveList &= this._game._boardMask();
+                        break;
+                    case 2:
+                        this._moveList <<= this._game.width;
+                        this._moveList &= this._game._boardMask();
+                        break;
+                    case 3:
+                        this._moveList >>= this._game.width;
+                        break;
+                }
+            }
+
+            hop() {
+                if (this._dir == 4 || this._moveList == 0n) { return; }
+
+                this._shift();
+                // make sure there's a piece to capture
+                if (this._player == "black") {
+                    this._moveList &= this._game._white;
+                } else {
+                    this._moveList &= this._game._black;
+                }
+
+                this._moveList &= ~this._game._borderMask(this._dir);
+                this._shift();
+                // make sure there's an empty space in the following position
+                this._moveList &= this._game._emptyMask();
+                this._hops += 1n;
+            }
+
+            /** Get a list of [x, y] positions from the current move list
+             * 
+             * @generator
+             * @yields {KonaneMove}
+             */
+            *currentMoves() {
+                if (this._dir == 4) { return; }
+
+                for (let i = 0n; i < this._game.width * this._game.height; ++i) {
+                    if ((this._moveList & (1n << i)) != 0n) {
+                        const toX = i % this._game.width;
+                        const toY = i / this._game.width;
+                        let fromX = toX;
+                        let fromY = toY;
+                        if (this._dir == 0) {
+                            fromX = toX + 2n * this._hops;
+                        }
+                        if (this._dir == 1) {
+                            fromX = toX - 2n * this._hops;
+                        }
+                        if (this._dir == 2) {
+                            fromY = toY - 2n * this._hops;
+                        }
+                        if (this._dir == 3) {
+                            fromY = toY + 2n * this._hops;
+                        }
+                        yield new KonaneMove(fromX, fromY, toX, toY);
+                    }
+                }
+            }
+
+            /** Get a list of [x, y] positions for all remaining moves in the current direction
+             * 
+             * @generator
+             * @yields {KonaneMove}
+             */
+            *allMovesInCurrentDirection() {
+                if (this._dir == 4) { return; }
+
+                while (this._moveList != 0n) {
+                    yield* this.currentMoves();
+                    this.hop();
+                }
+            }
+
+            /** Get a list of [x, y] positions for all remaining moves
+             * 
+             * @generator
+             * @yields {KonaneMove}
+             */
+            *allMoves() {
+                while (this._dir < 4) {
+                    yield* this.allMovesInCurrentDirection();
+                    this._setDir(this._dir + 1);
+                }
+            }
+        }
+
+        class Konane {
+            /**
+             * @type {Record<Konane, MoveSet|NumberUpStar>}
+             */
+            static #moveCache = {};
+
+            /**
+             * @param {number | bigint} w
+             * @param {number | bigint} h
+             */
+            constructor(w, h) {
+                this._width = requireInteger(w, "width");
+                this._height = requireInteger(h, "height");
+                this._black = BigInt.asUintN(Number(this._width * this._height), 0n);
+                this._white = BigInt.asUintN(Number(this._width * this._height), 0n);
+            }
+
+            /** Build a game from a string where "x" is black, "o" is white, "_" is empty and any whitespace character marks a move to the next row
+             * 
+             * @param {string} boardStr
+             * @throws {TypeError}
+             * @throws {Error} invalid character in input
+             * @returns {Konane}
+            */
+            static fromString(boardStr) {
+                if (typeof (boardStr) != "string") {
+                    throw new TypeError(`expected board to be a string, got "${boardStr}"`)
+                }
+                const rowStrs = boardStr.trim().split(/\s+/).map(row => row.trim());
+                const h = rowStrs.length;
+                const w = Math.max(...rowStrs.map(r => r.length));
+                const board = new Konane(w, h);
+
+                for (let y = 0n; y < h; ++y) {
+                    for (let x = 0n; x < rowStrs[y].length; ++x) {
+                        switch (rowStrs[y][x]) {
+                            case '_':
+                                break;
+                            case 'x':
+                                board.setTile(x, y, "black");
+                                break;
+                            case 'o':
+                                board.setTile(x, y, "white");
+                                break;
+                            default:
+                                throw new Error(`unexpected character in state string: "${rowStrs[y][x]}" (full: "${str}")`)
+                        }
+                    }
+                }
+                return board;
+            }
+
+            /** Convert a 2D tile coordinate into the equivalent index into the tile bitmap
+             * 
+             * @access private
+             * @param {bigint | number} x
+             * @param {bigint | number} y
+             * @throws {Error} thrown if coordinate is out of bounds
+             * @throws {TypeError} x or y are not numeric or integer-like
+             * @returns {bigint}
+             */
+            _tileIndex(x, y) {
+                const bigX = requireInteger(x, "x coordinate");
+                const bigY = requireInteger(y, "y coordinate");
+                if (bigX >= this.width || bigY >= this.height) {
+                    throw Error(`tile coordinate <${x}, ${y}> is out of bounds for a ${this.width}x${this.height} board`);
+                }
+
+                return bigX + (bigY * this._width);
+            }
+
+            /** Get a bitboard with every element set to 1
+             * 
+             * @access private
+             * @returns {bigint}
+             */
+            _boardMask() {
+                return ~BigInt.asUintN(Number(this._width * this._height), 0n)
+            }
+
+            /** Get a bitboard with the all elements in the n'th row set to 1
+             * 
+             * @param {bigint | number} n
+             * @access private
+             * @throws {TypeError} 
+             * @throws {Error} n is out of bounds
+             * @returns {bigint}
+             */
+            _rowMask(n = 0n) {
+                const bigN = requireInteger(n, "column index");
+                if (bigN >= this.height) {
+                    throw new Error(`row index '${n}' is out of bounds for board size ${this.width}x${this.height}`);
+                }
+                let mask = 0n;
+                for (let x = 0; x < this.width; ++x) {
+                    mask |= 1n << this._tileIndex(x, n);
+                }
+                return mask;
+            }
+
+            /** Get a bitboard with the all elements in the n'th column set to 1
+             * 
+             * @param {bigint | number} n
+             * @access private
+             * @returns {bigint}
+             */
+            _columnMask(n = 0n) {
+                const bigN = requireInteger(n, "column index");
+                if (bigN >= this.width) {
+                    throw new Error(`column index '${n}' is out of bounds for board size ${this.width}x${this.height}`);
+                }
+                let mask = 0n;
+                for (let y = 0; y < this.height; ++y) {
+                    mask |= 1n << this._tileIndex(n, y);
+                }
+                return mask;
+            }
+
+            /** Get a bit mask for the given border
+             * 
+             * @param {0 | 1 | 2 | 3} border the border 0 = "left", 1 = "right", 2 = "down", 3 = "up"
+             * @returns {bigint}
+             * @access private
+             */
+            _borderMask(border) {
+                switch (border) {
+                    case 0:
+                        return this._columnMask(0);
+                    case 1:
+                        return this._columnMask(this.width - 1n);
+                    case 2:
+                        return this._rowMask(this.height - 1n);
+                    case 3:
+                        return this._rowMask(0);
+                    default:
+                        throw new Error(`invalid value for border, expect [0, 3], got ${border}`)
+                }
+            }
+
+            /** Get a bit board with a 1 in all empty spaces
+             * @returns {bigint}
+             */
+            _emptyMask() {
+                return ~(this._white | this._black)
+            }
+
+            get width() { return this._width; }
+            get height() { return this._height; }
+
+            /** 
+             * get the state of the tile at <x, y>
+             * @param {bigint | number} x
+             * @param {bigint | number} y
+             * @returns {TileState}
+             */
+            setTile(x, y, state) {
+                const bit = 1n << this._tileIndex(x, y);
+                const bitInv = this._boardMask() ^ bit;
+                switch (requireStateString(state)) {
+                    case "black":
+                        this._black |= bit;
+                        this._white &= bitInv;
+                        break;
+                    case "white":
+                        this._white |= bit;
+                        this._black &= bitInv;
+                        break;
+                    case "empty":
+                        this._black &= bitInv;
+                        this._white &= bitInv;
+                        break;
+                    default:
+                        throw Error("invalid value from requireStateString: this should be impossible");
+                }
+            }
+
+            /** Set the tile at <x, y> to the given state
+             * @param {bigint | number} x
+             * @param {bigint | number} y
+             * @param {TileState} state
+             * @returns void
+            */
+            getTile(x, y) {
+                const mask = 1n << this._tileIndex(x, y);
+                const isBlack = (this._black & mask) != 0n;
+                const isWhite = (this._white & mask) != 0n;
+                if (isBlack && isWhite) {
+                    throw new Error(`invalid state for tile at <${x}, ${y}>, marked as both black and white`);
+                } else if (isBlack) {
+                    return "black";
+                } else if (isWhite) {
+                    return "white";
+                } else {
+                    return "empty";
+                }
+            }
+
+            /** Get a generator for all moves of the given player
+             * 
+             * @param {"black" | "white"} player
+             * @returns {KonaneMoveGenerator}
+             */
+            moves(player) {
+                return new KonaneMoveGenerator(this, player);
+            }
+
+            /** Get a generator for all moves from the given tile
+             * 
+             * @param {"black" | "white"} player
+             * @generator
+             * @yields {KonaneMove}
+             */
+            *movesFrom(fromX, fromY) {
+                const tileState = this.getTile(fromX, fromY);
+                if (tileState == "empty") {
+                    return
+                }
+
+                for (const move of this.moves(tileState).allMoves()) {
+                    if (move.fromX == fromX && move.fromY == fromY) {
+                        yield move;
+                    }
+                }
+            }
+
+            applyMove(move, player) {
+                for (const { x, y } of move.clearedCells()) {
+                    this.setTile(x, y, "empty");
+                }
+                this.setTile(move.toX, move.toY, player);
+            }
+
+            serialize() {
+                const boardBits = this.width * this.height;
+                let serialized = BigInt.asUintN(Number(boardBits) * 2 + 16, this.width);
+                serialized |= (this.height << 8n);
+                serialized |= (this._black << 16n);
+                serialized |= (this._white << (16n + boardBits));
+                return serialized;
+            }
+
+            canonicalForm() {
+                const serialized = this.serialize();
+                if (!(serialized in Konane.#moveCache)) {
+                    let left = [];
+                    let right = [];
+                    let wipGame = null;
+                    for (const move of this.moves("black").allMoves()) {
+                        wipGame = this.clone();
+                        wipGame.applyMove(move, "black");
+                        left.push(wipGame.canonicalForm());
+                    }
+                    for (const move of this.moves("white").allMoves()) {
+                        wipGame = this.clone();
+                        wipGame.applyMove(move, "white");
+                        right.push(wipGame.canonicalForm());
+                    }
+                    Konane.#moveCache[serialized] = canonicalForm(left, right);
+                }
+
+                return Konane.#moveCache[serialized];
+            }
+
+            toString() {
+                let str = ""
+                for (let y = 0n; y < this.height; ++y) {
+                    for (let x = 0n; x < this.width; ++x) {
+                        switch (this.getTile(x, y)) {
+                            case "black":
+                                str += "x";
+                                break;
+                            case "white":
+                                str += "o";
+                                break;
+                            case "empty":
+                                str += "_"
+                                break;
+                        }
+                    }
+                    if (y != this.height - 1n) {
+                        str += "\n"
+                    }
+                }
+                return str;
+            }
+
+            /** Copy the board state and modify the size.
+             * 
+             * This function only adds rows to the bottom, and columns to the right.
+             * Rows and columns may also be removed.
+             * 
+             * @param {bigint | number} newW
+             * @param {bigint | number} newH
+             * @returns {Konane}
+             */
+            cloneWithSize(newW, newH) {
+                const newGame = new Konane(newW, newH);
+                if (this._black != 0 || this._white != 0) {
+                    for (let y = 0; y < this._height; ++y) {
+                        newGame._black |= ((this._black & this._rowMask(y)) >> (this.width * y)) << (y * newW);
+                        newGame._white |= ((this._white & this._rowMask(y)) >> (this.width * y)) << (y * newW);
+                    }
+                }
+                return newGame;
+            }
+
+            /** Create a copy of this game
+             * @returns {Konane}
+             */
+            clone() {
+                const newGame = new Konane(this.width, this.height);
+                newGame._black = this._black;
+                newGame._white = this._white;
+                return newGame;
+            }
+        }
+    </script>
+
+    <template id="template-konane">
+        <link rel="stylesheet" class="global"
+            href="https://cdnjs.cloudflare.com/ajax/libs/concrete.css/3.0.0/concrete.min.css" />
+        <style>
+            #board {
+                display: grid;
+                grid-template-columns: repeat(var(--konane-width), 1fr);
+                grid-template-rows: repeat(var(--konane-height), 1fr);
+                background-color: var(--bg);
+                aspect-ratio: var(--konane-width) / var(--konane-height);
+            }
+
+            .cell {
+                border: 1px solid var(--fg);
+                padding: 10%;
+            }
+
+            .highlight {
+                background-color: yellow;
+                opacity: 50%;
+            }
+
+            .black {
+                border-radius: 50%;
+                background-color: black;
+                border: 1px solid var(--fg);
+                aspect-ratio: 1;
+            }
+
+            .white {
+                border-radius: 50%;
+                background-color: white;
+                border: 1px solid var(--fg);
+                aspect-ratio: 1;
+            }
+
+            .icon {
+                font-size: 14pt;
+            }
+
+            #controls {
+                padding: 8pt;
+                display: grid;
+                grid-template-rows: 1fr 1fr 1fr;
+                column-gap: 4pt;
+            }
+
+            #value {
+                font-size: 20pt;
+                grid-column: span 2;
+                flex-basis: 100%;
+                padding-top: 0.5em;
+                text-align: left;
+                padding-left: 1em;
+            }
+
+            #game {
+                display: grid;
+                grid-template-columns: 4fr 1fr;
+            }
+
+            .active {
+                animation: shake 1s cubic-bezier(.36, .07, .19, .97) infinite;
+            }
+
+            @keyframes shake {
+                10%,
+                90% {
+                    transform: translate3d(-1px, 1px, 0);
+                }
+                20%,
+                80% {
+                    transform: translate3d(2px, -1px, 0);
+                }
+                30%,
+                50%,
+                70% {
+                    transform: translate3d(-2px, 1px, 0);
+                }
+                40%,
+                60% {
+                    transform: translate3d(2px, -1px, 0);
+                }
+            }
+
+            button {
+                aspect-ratio: 1;
+                max-width: fit-content;
+            }
+        </style>
+        <div id="game">
+            <div id="board"></div>
+            <div id="controls">
+                <button id="prev">⏮</button>
+                <button id="reset">⟲</button>
+                <button id="next">⏭</button>
+            </div>
+            <div id="value"></div>
+        </div>
+    </template>
+
+    <script>
+        // Konane Game HTML Element
+        class KonaneHTMLElement extends HTMLElement {
+            static get observedAttributes() {
+                return ["player", "turn"];
+            }
+
+            #innerTextObserver = new MutationObserver(() => {
+                this.refreshBoardState();
+            });
+            #runtimeStyles = new CSSStyleSheet();
+            #interactiveColor = "black";
+            #proposedMoves = [];
+            #history = [];
+            #historyIdx = -1;
+            #activeCell = null;
+
+            static fromGame(game) {
+                let elem = new KonaneHTMLElement();
+                elem.innerHTML = game.toString();
+                return elem
+            }
+
+            constructor() {
+                super();
+                this.#innerTextObserver.observe(this, { childList: true, characterData: true, characterDataOldValue: true });
+
+                const template = document.getElementById("template-konane").content;
+                const root = template.cloneNode(true);
+
+                const shadowRoot = this.attachShadow({ mode: "open" });
+                shadowRoot.adoptedStyleSheets.push(this.#runtimeStyles);
+                shadowRoot.appendChild(root);
+
+                this.#interactiveColor = requireStateString(this.getAttribute("player") ?? "black");
+                this.refreshBoardState();
+            }
+
+            connectedCallback() {
+                this.shadowRoot.getElementById("next").addEventListener("click", () => {
+                    this.redo();
+                })
+                this.shadowRoot.getElementById("prev").addEventListener("click", () => {
+                    this.undo();
+                })
+
+                this.shadowRoot.getElementById("reset").addEventListener("click", () => {
+                    this.refreshBoardState();
+                })
+            }
+
+            refreshBoardState() {
+                const boardStr = this.innerHTML == "" ? "__\n__" : this.innerHTML;
+                this.#proposedMoves = [];
+                this.#historyIdx = 0;
+                const currentPlayer = requireStateString(this.getAttribute("turn") ?? "black");
+                this.#history = [[Konane.fromString(boardStr), currentPlayer]];
+
+                this.createAllTiles();
+                this.updateValue();
+                this.dispatchEvent(new CustomEvent("game-init", { detail: { state: this.game.clone() } }));
+            }
+
+            /** Add a move to the list of highlighted moves.
+             * 
+             * If the current turn is interactable, then these cells can be clicked to take the move 
+             * 
+             * @param {KonaneMove} move  
+             */
+            proposeMove(move) {
+                if (!(move instanceof KonaneMove)) {
+                    throw new TypeError(`expected an instance of KonaneMove, found ${move}`);
+                }
+
+                this.#proposedMoves.push(move);
+                this._getTileNode(move.toX, move.toY)?.parentElement?.classList?.add("highlight");
+            }
+
+            /**
+             * Remove all highlighted moves that were added with proposeMove
+             */
+            clearProposedMoves() {
+                this.#proposedMoves = [];
+                this.shadowRoot
+                    .querySelectorAll(".cell.highlight")
+                    .forEach((cell) => cell.classList.remove("highlight"));
+            }
+
+            updateValue() {
+                this.shadowRoot.getElementById("value").innerHTML = this.game.canonicalForm().toString();
+            }
+
+            activateCell(x, y) {
+                if (this.#activeCell != null) {
+                    this._getTileNode(this.#activeCell[0], this.#activeCell[1])?.classList.remove("active");
+                }
+                this.#activeCell = [x, y];
+                this._getTileNode(x, y)?.classList.add("active");
+            }
+
+            deactivateCell() {
+                if (this.#activeCell != null) {
+                    this._getTileNode(this.#activeCell[0], this.#activeCell[1])?.classList.remove("active");
+                }
+            }
+
+            proposeMovesForCell(x, y) {
+                this.activateCell(x, y);
+                for (const move of this.game.movesFrom(x, y)) {
+                    this.proposeMove(move);
+                }
+            }
+
+            /** Apply a given move
+             *
+             * @param {KonaneMove} move
+             */
+            applyMove(move) {
+                if (!(move instanceof KonaneMove)) {
+                    throw new TypeError(`expected an instance of KonaneMove, found ${move}`);
+                }
+                if (this.#history.length > this.#historyIdx + 1) {
+                    this.#history = this.#history.slice(0, this.#historyIdx + 1);
+                }
+                this.clearProposedMoves();
+                this.#history.push([this.game.clone(), this.currentPlayer == "black" ? "white" : "black"]);
+                this.#historyIdx += 1;
+                this.setTileState(move.toX, move.toY, this.game.getTile(move.fromX, move.fromY));
+                for (const { x, y } of move.clearedCells()) {
+                    this.setTileState(x, y, "empty");
+                }
+                this.updateValue();
+
+                const currentPlayerHasMoves = !this.game.moves(this.currentPlayer).allMoves().next().done;
+                if (!currentPlayerHasMoves) {
+                    this.dispatchEvent(new CustomEvent("game-complete", { detail: { winner: this.currentPlayer == "black" ? "white" : "black" } } ));
+                }
+
+                if (this.currentPlayer != this.#interactiveColor) {
+                    this.computerTurn();
+                }
+
+            }
+
+            get history() {
+                return this.#history;
+            }
+
+            get game() {
+                return this.#history[this.#historyIdx][0];
+            }
+
+            get currentPlayer() {
+                return this.#history[this.#historyIdx][1];
+            }
+
+            undo() {
+                if (this.#historyIdx < 0) {
+                    return;
+                }
+
+                this.#historyIdx -= 1;
+                this.createAllTiles();
+                this.updateValue();
+            }
+
+            redo() {
+                if (this.#historyIdx == this.#history.length - 1) {
+                    return;
+                }
+
+                this.#historyIdx += 1;
+                this.createAllTiles();
+                this.updateValue();
+            }
+
+            computerMoveChoice(options) {
+                let best = [0, options[0].canonicalForm()];
+                for (const i in options) {
+                    const canon = options[i].canonicalForm();
+                    const cmp = canon.partialCompare(best[1]);
+                    if (this.currentPlayer == "black" && cmp > 0) {
+                        best = [i, canon];
+                    } else if (this.currentPlayer == "white" && cmp < 0) {
+                        best = [i, canon];
+                    }
+                }
+
+                return best[0];
+            }
+
+            computerTurn() {
+                const moves = [...this.game.moves(this.currentPlayer).allMoves()];
+                if (moves.length == 0) {
+                    return;
+                }
+                const games = moves.map(m => {
+                    const g = this.game.clone();
+                    g.applyMove(m, this.currentPlayer);
+                    return g;
+                });
+                const chosenMove = this.computerMoveChoice(games);
+                // short delay after the player's move before proposing alternate moves
+                window.setTimeout(() => {
+                    const fromX = moves[chosenMove].fromX;
+                    const fromY = moves[chosenMove].fromY;
+
+                    this.activateCell(fromX, fromY);
+                    moves
+                        .filter(m => m.fromX == fromX && m.fromY == fromY)
+                        .forEach(m => this.proposeMove(m));
+                    window.setTimeout(() => {
+                        this.applyMove(moves[chosenMove]);
+                    }, 1000)
+                }, 350)
+            }
+
+            _makeTileNode(x, y, state) {
+                x = requireInteger(x, "x coordinate");
+                y = requireInteger(y, "y coordinate");
+                if (!["empty", "black", "white"].includes(state)) {
+                    throw Error(`tried to set node at <${x}, ${y}> to an invalid state: '${state}'`);
+                }
+                const wrapperEl = document.createElement("div");
+                wrapperEl.setAttribute("class", "cell");
+
+                const stoneEl = document.createElement("div");
+                stoneEl.setAttribute("id", `tile-x${x}y${y}`);
+                stoneEl.setAttribute("class", state);
+
+                wrapperEl.appendChild(stoneEl);
+                wrapperEl.addEventListener("click", (_) => {
+                    if (this.currentPlayer == this.#interactiveColor) {
+                        if (this.#interactiveColor == this.game.getTile(x, y)) {
+                            if (this.#activeCell != null) {
+                                this.clearProposedMoves();
+                                if (this.#activeCell[0] === x && this.#activeCell[1] === y) {
+                                    this.deactivateCell();
+                                    return;
+                                }
+                            }
+                            this.proposeMovesForCell(x, y);
+                        }
+
+                        const proposed = this.#proposedMoves.find((move) => move.toX == x && move.toY == y);
+                        if (proposed instanceof KonaneMove) {
+                            this.applyMove(proposed);
+                            this.clearProposedMoves();
+                        }
+                    }
+                })
+
+                return wrapperEl;
+            }
+
+            _setTileNode(x, y, state) {
+                x = requireInteger(x, "x coordinate");
+                y = requireInteger(y, "y coordinate");
+                if (!["empty", "black", "white"].includes(state)) {
+                    throw Error(`tried to set node at <${x}, ${y}> to an invalid state: '${state}'`);
+                }
+                const node = this._mustGetTileNode(x, y);
+
+                this._mustGetTileNode(x, y).setAttribute("class", state)
+            }
+
+
+            _getTileNode(x, y) {
+                x = requireInteger(x, "x coordinate");
+                y = requireInteger(y, "y coordinate");
+
+                return this.shadowRoot.getElementById(`tile-x${x}y${y}`);
+            }
+
+            _mustGetTileNode(x, y) {
+                const el = this._getTileNode(x, y)
+                if (!el) {
+                    throw Error(`could not find an element for the tile at <${x}, ${y}>`)
+                }
+                return el;
+            }
+
+            createAllTiles() {
+                this.#runtimeStyles.replaceSync(
+                    `:host {
+                --konane-width: ${this.game.width};
+                --konane-height: ${this.game.height};
+            }`)
+                const nodes = []
+                for (let y = 0; y < this.game.height; ++y) {
+                    for (let x = 0; x < this.game.width; ++x) {
+                        nodes.push(this._makeTileNode(x, y, this.game.getTile(x, y)))
+                    }
+                }
+                this.shadowRoot.getElementById("board").replaceChildren(...nodes)
+            }
+
+
+            setTileState(x, y, state) {
+                this.game.setTile(x, y, state)
+                this._setTileNode(x, y, state);
+            }
+        }
+
+        customElements.define("irs-konane", KonaneHTMLElement);
+    </script>
+
+
+    <link rel="stylesheet" class="global"
+        href="https://cdnjs.cloudflare.com/ajax/libs/concrete.css/3.0.0/concrete.min.css">
+
+    <style>
+        .side-by-side {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            flex-direction: row;
+            justify-content: center;
+            column-gap: 2em;
+            padding: 1em;
+        }
+
+        .hint {
+            color: gray;
+        }
+    </style>
+
+</head>
+
+<body>
+    <main>
+        <section id="introduction">
+            <h1>Let's Play Konane</h1>
+            <p>You'll play as black in this game, so you get to go first!</p>
+            <div class="side-by-side">
+                <div>
+                    <div class="hint">
+                        HINT: Try clicking or tapping on one of the black circles.
+                    </div>
+                    <br/>
+                    <div>
+                        <span style="font-weight: bolder;" id="intro-game-winner"></span>
+                    </div>
+                </div>
+                <irs-konane id="intro-game">
+                    ____
+                    _xo_
+                    __xo_
+                    _____
+                </irs-konane>
+                <script>
+                    document.getElementById("intro-game").addEventListener("game-complete", ev => {
+                        if (ev.detail.winner == "black") {
+                            document.getElementById("intro-game-winner").innerText = "you won!"
+                        } else {
+                            document.getElementById("intro-game-winner").innerText = "you lost 😔\ntry clicking the reset button."
+                        }
+                    });
+                    document.getElementById("intro-game").addEventListener("game-init", ev => {
+                        document.getElementById("intro-game-winner").innerText = "";
+                    });
+                </script>
+            </div>
+            <p>
+                Konane is a 2 player ancient Hawaiian game played on a rectangular grid.
+                One player uses black pieces, and the other white pieces.
+                To move a piece, a player must jump over one of their opponents pieces.
+                The first player unable to make a move loses.
+            </p>
+            <p style="text-align: center;">Try playing on the above board a bit to get a feel for the game.</p>
+
+            <div style="height: 12pt;"></div>
+            <hr style="width: 120%; margin-left: -10%;"/>
+            <div style="height: 12pt;"></div>
+            <p>Any number of jumps can be made in a single direction.
+                For example, in this game you (black), can capture 1, 2, 3, or 4 white pieces.
+            </p>
+            <div style="display: flex; justify-content: center;">
+                <irs-konane style="padding: 4pt" id="game-long-jump" >
+                    __
+                    __
+                    xo_o_o_o_
+                    __
+                </irs-konane>
+            </div>
+        </section>
+
+
+    </main>
+    <div style="display: flex; flex-flow: row wrap;" id="child-games"></div>
+    <template id="template-game-children">
+        <style>
+            .wrapper {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                grid-template-rows: min-content min-content max-content;
+                width: 100%;
+                margin: auto;
+                column-gap: 1em;
+            }
+
+            #original {
+                grid-column: span 2;
+                width: 40%;
+                margin: auto;
+
+            }
+
+            .gamelist {
+                display: flex;
+                flex-direction: column;
+            }
+        </style>
+        <div class="wrapper">
+            <hr />
+            <irs-konane id="original"></irs-konane>
+
+            <h1>Left</h1>
+            <h1>Right</h1>
+
+            <div id="left-moves" class="gamelist">
+            </div>
+
+            <div id="right-moves" class="gamelist">
+            </div>
+        </div>
+    </template>
+    <script>
+        function withMoves(game, fn) {
+            let l = [...game.moves("black").allMoves()].map(m => { const lm = game.clone(); lm.applyMove(m); return lm; });
+            let r = [...game.moves("white").allMoves()].map(m => { const lm = game.clone(); lm.applyMove(m); return lm; });
+            return fn(l, r)
+        }
+
+        function addChildMovesOf(game, id = null) {
+            const template = document.getElementById("template-game-children").content;
+            const elem = template.cloneNode(true);
+            elem.getElementById("original").innerHTML = game.toString();
+            withMoves(game, (gL, gR) => {
+                for (const l of gL) {
+                    elem.getElementById("left-moves").appendChild(KonaneHTMLElement.fromGame(l));
+                }
+                for (const r of gR) {
+                    elem.getElementById("right-moves").appendChild(KonaneHTMLElement.fromGame(r));
+                }
+            })
+            if (id != null) {
+                // elem.setAttribute("id", id.toString());
+            }
+            document.getElementById("child-games").appendChild(elem);
+        }
+    </script>
+</body>
+
+
+</html>
