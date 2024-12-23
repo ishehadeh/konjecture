@@ -7,9 +7,121 @@
 
     <title>Konane</title>
 
-    <script type="text/javascript" name="Konane Utilities">
-        // Script: Utilities
-        //  These are mostly type-checking functions
+    <script type="text/javascript" id="Testing Utilites">
+        /* First we're going set up a few utilities for verifying our math is correct.
+         * This script allows us to register a test with
+         *             
+         *       test("my test", (t) => { t.assert(....) });
+         * 
+         * Then, later all registered tests can be run with `runTests()`;
+         */
+
+        class TestFailure extends Error { }
+
+        class TestCtx {
+            assert(condition, message = "assert failed") {
+                if (!condition) {
+                    throw new TestFailure(message)
+                }
+            }
+
+            assertEq(lhs, rhs, message = "assert failed", lhsName = "lhs", rhsName = "rhs") {
+                if (typeof lhs !== typeof rhs) {
+                    throw new TestFailure(`${message}: ${lhsName} !== ${rhsName} [type mismatch]; left=${lhs}, right=${rhs}`);
+                }
+                if (lhs instanceof PartialOrder && rhs instanceof PartialOrder) {
+                    if (lhs.partialCompare(rhs) !== 0) {
+                        throw new TestFailure(`${message}: ${lhsName} !== ${rhsName} [partialCompare]; left=${lhs}, right=${rhs}`);
+                    }
+                    return;
+                }
+                switch (typeof lhs) {
+                    case "object":
+                        if (lhs != null && rhs != null) {
+                            for (const [k, v] of Object.entries(lhs)) {
+                                assertEq(v, rhs[k], message, `${lhsName}.${k}`, `${rhsName}.${k}`)
+                            }
+                            break;
+                        }
+                    // fallthrough: primitive compare works on null
+                    case "number":
+                        if (Number.isNaN(lhs) && Number.isNaN(rhs)) return;
+                    default:
+                        if (lhs !== rhs) {
+                            throw new TestFailure(`${message}: ${lhsName} !== ${rhsName} [primitive equality]; left=${lhs}, right=${rhs}`);
+                        }
+                }
+            }
+        }
+
+        class TestSet {
+            /** Ordered map of tests registered with TestSet.add()
+             * @type {Map<string, () => void>}
+             */
+            #tests = new Map();
+            constructor() { }
+
+            /** add a test to the list
+             * @param {string} name
+             * @param {(t: TestCtx) => void} test callback function to run the test
+             */
+            add(name, test) {
+                this.#tests.set(name, test);
+            }
+
+            /** Run all tests that match the given pattern
+             * @param {string | RegExp} pattern
+             * @returns {Map<string, Error | true>}
+             */
+            run(pattern = undefined) {
+                const failures = new Map();
+                for (const [name, test] of this.#tests.entries()) {
+                    if (pattern === undefined || pattern === null || name.match(pattern)) {
+                        try {
+                            test(new TestCtx);
+                            failures.set(name, true);
+                        } catch (e) {
+                            failures.set(name, e);
+                        }
+                    }
+                }
+
+                return failures
+            }
+        }
+
+        const _gTestSet = new TestSet();
+
+        /** add to the global test set.
+         * 
+         * @param {string} name
+         * @param {(t: TestCtx) => void} test callback function to run the test
+         */
+        function test(name, op) {
+            return _gTestSet.add(name, op);
+        }
+
+        /** Run all tests that match `pattern` in the global test set.
+         *  Write results to via console.log()
+         * 
+         * @param {RegExp | string | undefined} pattern
+         */
+        function runTests(pattern = undefined) {
+            const failures = _gTestSet.run(pattern);
+            console.log("Test Results");
+            for (const [name, result] of failures.entries()) {
+                if (result === true) {
+                    console.log(`  ${name}... ok`);
+                } else {
+                    console.log(`  ${name}... failed`, result);
+                }
+            }
+        }
+    </script>
+
+    <script type="text/javascript" id="Utilities">
+        /* misc functions that we'll use throughout the following scripts
+         */
 
         /** Verify that `n` is a bigint or number, cast n to BigInt and copy it
          * 
@@ -28,11 +140,17 @@
 
             return Object.freeze(BigInt(n));
         }
+        test("requireInteger copies bigint", (t) => {
+            let a = 0n;
+            let b = requireInteger(a);
+            a += 1n;
+            t.assertEq(a, 1n);
+            t.assertEq(b, 0n);
+        })
 
         /**
          * @typedef {"black" | "white" | "empty"} TileState
          */
-
 
         /** Verify that `state` is a valid tile state string or number
          * 
@@ -116,7 +234,7 @@
     <script type="text/javascript" id="Combinatorial Game Theory Primitives">
         /** 
          * @typdef {-1 | 0 | 1} Ordering
-         * @typdef {Ordering | null} PartialOrdering
+         * @typdef {Ordering | NaN} PartialOrdering
          */
 
         /** Marks child classes as partially (optionally) comparable
@@ -210,7 +328,7 @@
              * @param {CanonicalForm} rhs
              * @returns {PartialOrdering}
              */
-            partialCompare(rhs) {
+            partialCompare(rhs, checkEquality = true) {
                 // TEMPERATURE THEORY AND THE THERMOSTATIC STRATEGY, Karen Ye
                 // https://www.math.uchicago.edu/~may/VIGRE/VIGRE2009/REUPapers/Ye.pdf
                 // Definition 2.3: An equivalent definition of inequality is that G ≥ H if and only
@@ -221,47 +339,55 @@
                 const lhsL = this.leftMoves;
                 const lhsR = this.rightMoves;
 
-                let exact = rhsL.length > 0 || lhsR.length > 0;
+                let isLt = false;
                 // Check: "no option Hᴸ such that Hᴸ ≥ G"
                 for (const hL of rhsL) {
                     if (hL.partialCompare(this) >= 0) {
-                        return -1;
-                    }
-
-                    if (exact) {
-                        let hasMatch = false
-                        for (const gL of lhsL) {
-                            if (gL.partialCompare(hL) == 0) {
-                                hasMatch = true;
-                                break;
-                            }
-                        }
-                        exact = hasMatch;
+                        isLt = true;
+                        break;
                     }
                 }
 
-                // Check: " no option Gᴿ such that Gᴿ ≤ H"
-                for (const gR of lhsR) {
-                    if (gR.partialCompare(rhs) <= 0) {
-                        return -1;
-                    }
-
-                    if (exact) {
-                        let hasMatch = false
-                        for (const hR of rhsR) {
-                            if (hR.partialCompare(gR) == 0) {
-                                hasMatch = true;
-                                break;
-                            }
+                if (!isLt) {
+                    // Check: " no option Gᴿ such that Gᴿ ≤ H"
+                    for (const gR of lhsR) {
+                        if (gR.partialCompare(rhs) <= 0) {
+                            isLt = true;
+                            break;
                         }
-                        exact = hasMatch;
                     }
                 }
 
-                if (exact) {
+                // check the inverse, H >= G
+                let isGt = false;
+
+                // Check: "no option Gᴸ such that Gᴸ ≥ H"
+                for (const gL of lhsL) {
+                    if (gL.partialCompare(rhs) >= 0) {
+                        isGt = true;
+                        break;
+                    }
+                }
+
+                if (!isGt) {
+                    // Check: " no option Hᴿ such that Hᴿ ≤ G"
+                    for (const hR of rhsR) {
+                        if (hR.partialCompare(this) <= 0) {
+                            isGt = true;
+                            break;
+                        }
+                    }
+                }
+                
+                if (!isGt && !isLt) {
+                    // !(this < rhs) && !(this > rhs) ==> this == rhs
                     return 0;
-                } else {
+                } else if (isGt && !isLt) {
                     return 1;
+                } else if (isLt && !isGt) {
+                    return -1;
+                } else {
+                    return NaN;
                 }
             }
         }
@@ -270,7 +396,7 @@
          * 
          * @implements {Order}
          */
-        class DyadicRational {
+        class DyadicRational extends CanonicalForm {
             /** the "m" in m/(2^n)
              * @type {bigint}
              */
@@ -282,12 +408,24 @@
              */
             #denominatorExp
 
+            get leftMoves() {
+                const l = this.left();
+                return l ? [l] : [];
+            }
+
+            get rightMoves() {
+                const r = this.right();
+                return r ? [r] : [];
+            }
+
             /**
              * 
              * @param {bigint | number} numerator
              * @param {bigint | number} denominatorExp must be greater than or equal to zero
              */
             constructor(numerator, denominatorExp = 0n) {
+                super();
+
                 this.#numerator = requireInteger(numerator);
                 this.#denominatorExp = requireInteger(denominatorExp);
                 if (this.#denominatorExp < 0n) {
@@ -322,14 +460,18 @@
             }
 
             get numerator() { return this.#numerator; }
-            // get denominator() { return 2n ** this.denominatorExp; }
             get denominatorExp() { return this.#denominatorExp; }
+
+            /** Calculate the real denominator.
+             * @returns {bigint}
+             */
+            denominator() { return 2n ** this.denominatorExp; }
 
             toString() {
                 if (this.denominatorExp == 0n) {
                     return this.numerator.toString();
                 } else {
-                    return `${this.numerator}/(2^${this.denominatorExp})`;
+                    return `${this.numerator}/${this.denominator()}`;
                 }
             }
 
@@ -338,26 +480,17 @@
             }
 
             compare(rhs) {
-                const coercedRhs = DyadicRational.from(rhs);
-
-                // normalize first so we can compare denominators
-                this.normalize();
-
-                if (this.numerator != 0n && coercedRhs.numerator != 0n) {
-                    if (this.denominatorExp < coercedRhs.denominatorExp) {
-                        return 1;
-                    } else if (this.denominatorExp > coercedRhs.denominatorExp) {
-                        return -1;
-                    }
+                let compatRhs = DyadicRational.from(rhs);
+                let compatLhs = this;
+                if (compatRhs.denominatorExp < this.denominatorExp) {
+                    compatRhs = compatRhs.clone();
+                    compatRhs.#increaseDenom(this.denominatorExp);
+                } else if (compatRhs.denominatorExp > this.denominatorExp) {
+                    compatLhs = compatLhs.clone();
+                    compatLhs.#increaseDenom(compatRhs.denominatorExp);
                 }
 
-                if (this.numerator < coercedRhs.numerator) {
-                    return -1;
-                } else if (this.numerator > coercedRhs.numerator) {
-                    return 1;
-                } else {
-                    return 0;
-                }
+                return compareBigInt(compatLhs.numerator, compatRhs.numerator);
             }
 
             #increaseDenom(denomExp) {
@@ -432,10 +565,10 @@
                 return new DyadicRational((this.numerator - 1n) / 2n, this.denominatorExp - 1n);
             }
 
-            /** Add rhs to this rational
+            /** Add rhs to this rational, return a reference to self.
              * 
              * @param {DyadicRational} rhs
-             * @returns {void}
+             * @returns {DyadicRational}
              */
             add(rhs) {
                 // make sure we match denominators
@@ -449,21 +582,59 @@
 
                 this.#numerator += compatRhs.numerator
                 this.normalize();
+                return this;
             }
 
+
+            /** subtract rhs to this rational, return a reference to self.
+             * 
+             * @param {DyadicRational} rhs
+             * @returns {DyadicRational}
+             */
             sub(rhs) {
                 const rhsRat = DyadicRational.from(rhs);
                 rhsRat.neg();
                 this.add(rhsRat);
-            }
-
-            mul(rhs) {
-                const rhsRat = DyadicRational.from(rhs);
-                this.#numerator *= rhsRat.numerator;
-                this.#denominatorExp += rhsRat.denominatorExp;
-                this.normalize();
+                return this;
             }
         }
+        test("Dyadic rational addition", (t) => {
+            const rat = (n, d) => new DyadicRational(n, d);
+
+            t.assertEq(rat(2).add(1).compare(3), 0);
+            t.assertEq(rat(1, 1).add(1).compare(rat(3, 1)), 0);
+            t.assertEq(rat(3, 1).add(rat(1, 3)).compare(rat(13, 3)), 0);
+        });
+
+        test("Dyadic rational compare", (t) => {
+            const rat = (n, d) => new DyadicRational(n, d);
+
+            t.assertEq(rat(2).compare(1), 1);
+            t.assertEq(rat(1, 1).compare(rat(3, 1)), -1);
+            t.assertEq(rat(-1, 1).compare(rat(1, 1)), -1);
+            t.assertEq(rat(3, 1).compare(1), 1);
+            t.assertEq(rat(-3, 1).compare(-1), -1);
+        });
+
+
+        test("Dyadic rational left/right moves", (t) => {
+            const rat = (n, d) => new DyadicRational(n, d);
+
+            t.assertEq(rat(2).left(), rat(1));
+            t.assertEq(rat(2).right(), null);
+
+            t.assertEq(rat(-2).left(), null);
+            t.assertEq(rat(-2).right(), rat(-1));
+
+            t.assertEq(rat(3, 1).left(), rat(1));
+            t.assertEq(rat(3, 1).right(), rat(2));
+
+            t.assertEq(rat(-3, 1).left(), rat(-2));
+            t.assertEq(rat(-3, 1).right(), rat(-1));
+        });
+
+
+
 
         /** Sum of a dyadic rational number m/(2^n), an positive or negative infinitesimal (up), and a Nimber (star)
          * @prop {bigint} up
@@ -497,7 +668,6 @@
                 this.#star = requireInteger(star, "nimber");
                 if (this.#star < 0) {
                     throw new Error(`invalid NumberUpStar (${this}): star must be greater than or equal to zero.`);
-
                 }
             }
 
@@ -537,12 +707,7 @@
 
             partialCompare(rhsRaw) {
                 if (rhsRaw instanceof MoveSet) {
-                    const nus = rhsRaw.asNus();
-                    if (nus == null) {
-                        return super.partialCompare(rhsRaw);
-                    } else {
-                        rhsRaw = nus;
-                    }
+                    return super.partialCompare(rhsRaw);
                 }
 
                 // source: Lessons In Play, Observation 5.41, pg. 101.
@@ -570,15 +735,15 @@
 
                 // +/-^ is incomparable with *
                 if (absBigInt(this.up) == 1n && rhs.up == 0n && rhs.star != 0n) {
-                    return null
+                    return NaN
                 }
                 if (absBigInt(rhs.up) == 1n && this.up == 0n && this.star != 0n) {
-                    return null
+                    return NaN
                 }
 
                 // everything is equal except (maybe) star, so these values are incomparable
                 if (upCmp == 0) {
-                    return null
+                    return NaN
                 } else {
                     // with the exception of +/-^1, up overrules star
                     return upCmp
@@ -676,7 +841,28 @@
                 }
                 return str;
             }
+
+            clone() {
+                return new NumberUpStar(this.number, this.up, this.star)
+            }
         }
+
+        test("NumberUpStar compares up & up move set with star", (t) => {
+            let up = new NumberUpStar(0, 1, 0);
+            let down = new NumberUpStar(0, -1, 0);
+            let star = new NumberUpStar(0, 0, 1);
+
+            t.assertEq(star.partialCompare(up), NaN);
+            t.assertEq(star.partialCompare(down), NaN);
+            t.assertEq(new MoveSet([new NumberUpStar(0)], [down]), star);
+        })
+
+        test("NumberUpStar compares up with rational move set", (t) => {
+            const b = canonicalForm([new DyadicRational(11, 2)], [new DyadicRational(1, 1)]);
+
+            t.assertEq(new DyadicRational(2).partialCompare(b), NaN);
+            t.assertEq(new DyadicRational(2).partialCompare(new DyadicRational(11, 2)), -1);
+        })
 
         /** A list of left and right player moves
          * @implements {PartialOrder}
@@ -823,10 +1009,10 @@
             }
 
             get leftMoves() {
-                return this.left;
+                return this.left.map((m) => m.clone());
             }
             get rightMoves() {
-                return this.right;
+                return this.right.map((m) => m.clone());
             }
 
             normalize() {
@@ -839,23 +1025,8 @@
                 return this.asNus() ?? this;
             }
 
-            asNus() {
-                const num = this.asNumber();
-                if (num) {
-                    return new NumberUpStar(num);
-                }
-                const up = this.asUpStar() ?? this.asUp();
-                if (up) {
-                    return up;
-                }
-
+            asNimber() {
                 if (this.isImpartial()) {
-                    if (this.leftMoves.length == 1) {
-                        const number = this.leftMoves[0].asNumber();
-                        if (number != null) {
-                            return new NumberUpStar(number, 0, 1)
-                        }
-                    }
                     let nimbers = null;
                     for (const l of this.leftMoves) {
                         const nimber = l.asNimber();
@@ -879,6 +1050,57 @@
                     }
                 }
                 return null;
+            }
+
+            asNus() {
+                const num = this.asNumber();
+                if (num) {
+                    return new NumberUpStar(num);
+                }
+                const up = this.asUpStar() ?? this.asUp();
+                if (up) {
+                    return up;
+                }
+
+                if (this.isImpartial()) {
+                    if (this.leftMoves.length == 1) {
+                        const number = this.leftMoves[0].asNumber();
+                        if (number != null) {
+                            return new NumberUpStar(number, 0, 1)
+                        }
+                    }
+
+                    return this.asNimber()
+                }
+
+                if (this.rightMoves.length == 0 && this.leftMoves.length > 0) {
+                    let left = this.leftMoves
+                    let zeroCmp = left[0].partialCompare(new NumberUpStar(0));
+                    for (const l in left.slice(1)) {
+                        const lZeroCmp = left[0].partialCompare(new NumberUpStar(0));
+                        if (lZeroCmp != zeroCmp) {
+                            zeroCmp = null;
+                            break;
+                        }
+                    }
+                    if (zeroCmp == -1) {
+                        return new NumberUpStar(0)
+                    }
+                }
+                if (this.leftMoves.length == 0 && this.rightMoves.length > 0) {
+                    let left = this.rightMoves
+                    let zeroCmp = left[0].partialCompare(new NumberUpStar(0));
+                    for (const l in left.slice(1)) {
+                        const lZeroCmp = left[0].partialCompare(new NumberUpStar(0));
+                        if (lZeroCmp != zeroCmp) {
+                            zeroCmp = null;
+                            break;
+                        }
+                    }
+                    if (zeroCmp == -1) {
+                        return new NumberUpStar(0)
+                    }
+                }
             }
 
             /** Check if left == right
@@ -955,7 +1177,7 @@
                 for (const l of this.leftMoves) {
                     let lNum = l.asNumber();
                     if (lNum == null) {
-                        return null
+                        return;
                     }
                     if (leftMax == null || leftMax.compare(lNum) == -1) {
                         leftMax = lNum;
@@ -964,7 +1186,7 @@
                 for (const r of this.rightMoves) {
                     let rNum = r.asNumber();
                     if (rNum == null) {
-                        return null
+                        return;
                     }
                     if (rightMin == null || rightMin.compare(rNum) == 1) {
                         rightMin = rNum;
@@ -1047,6 +1269,31 @@
 
             return (new MoveSet(canonLeft, canonRight)).normalize();
         }
+        test("canonicalForm integration - failure on 12/23/2024", (t) => {
+            // { 0 | { { 2 | { 11/4 | 1/2 } } | { 15/4 | 0 } } }
+            const cf = canonicalForm;
+            const a = cf([new DyadicRational(15, 2)], [0]);
+            const b = cf([new DyadicRational(11, 2)], [new DyadicRational(1, 1)]);
+            const c = cf([2], [b]);
+            const d = cf([c], [a]);
+            const e = cf([0], [d]);
+
+            t.assertEq(canonicalForm([new DyadicRational(5,1)], [4]), new DyadicRational(3));
+
+            t.assertEq(c.partialCompare(new DyadicRational(11, 2)), -1);
+            t.assertEq(c.partialCompare(new DyadicRational(1, 1)), 1);
+            t.assertEq(d.partialCompare(new DyadicRational(15, 2)), -1);
+            t.assertEq(d.partialCompare(new DyadicRational(15, 2)), -1);
+            t.assertEq(cf([new DyadicRational(5, 1)], [new DyadicRational(15, 2)]), new DyadicRational(3));
+            t.assertEq(d, new NumberUpStar(3));
+            t.assertEq(e, new DyadicRational(1));
+        })
+        test("canonicalForm {0|-^} equiv. *", (t) => {
+
+            const star = canonicalForm([0], [new NumberUpStar(0, -1, 0)]);
+            t.assertEq(star, new NumberUpStar(0, 0, 1));
+            t.assert(star instanceof NumberUpStar);
+        })
     </script>
 
     <script type="text/javascript" id="Konane Mechanics">
@@ -1071,10 +1318,10 @@
                 }
             }
 
-            get fromX() { return this.#fromX }
-            get fromY() { return this.#fromY }
-            get toX() { return this.#toX }
-            get toY() { return this.#toY }
+            get fromX() { return 0n + this.#fromX }
+            get fromY() { return 0n + this.#fromY }
+            get toX() { return 0n + this.#toX }
+            get toY() { return 0n + this.#toY }
 
             *clearedCells() {
                 let xDiff = 0n;
@@ -1142,20 +1389,19 @@
              * @access private
              */
             _shift() {
+                const bits = Number(this._game.width * this._game.height);
                 switch (this._dir) {
                     case 0:
-                        this._moveList >>= 1n;
+                        this._moveList = BigInt.asUintN(bits, this._moveList >> 1n)
                         break;
                     case 1:
-                        this._moveList <<= 1n;
-                        this._moveList &= this._game._boardMask();
+                        this._moveList = BigInt.asUintN(bits, this._moveList << 1n)
                         break;
                     case 2:
-                        this._moveList <<= this._game.width;
-                        this._moveList &= this._game._boardMask();
+                        this._moveList = BigInt.asUintN(bits, this._moveList << this._game.width)
                         break;
                     case 3:
-                        this._moveList >>= this._game.width;
+                        this._moveList = BigInt.asUintN(bits, this._moveList >> this._game.width)
                         break;
                 }
             }
@@ -1163,6 +1409,7 @@
             hop() {
                 if (this._dir == 4 || this._moveList == 0n) { return; }
 
+                this._moveList &= ~this._game._borderMask(this._dir);
                 this._shift();
                 // make sure there's a piece to capture
                 if (this._player == "black") {
@@ -1329,7 +1576,7 @@
                 if (bigN >= this.height) {
                     throw new Error(`row index '${n}' is out of bounds for board size ${this.width}x${this.height}`);
                 }
-                let mask = 0n;
+                let mask = BigInt.asUintN(Number(this._width * this._height), 0n);
                 for (let x = 0; x < this.width; ++x) {
                     mask |= 1n << this._tileIndex(x, n);
                 }
@@ -1347,7 +1594,7 @@
                 if (bigN >= this.width) {
                     throw new Error(`column index '${n}' is out of bounds for board size ${this.width}x${this.height}`);
                 }
-                let mask = 0n;
+                let mask = BigInt.asUintN(Number(this._width * this._height), 0n);
                 for (let y = 0; y < this.height; ++y) {
                     mask |= 1n << this._tileIndex(n, y);
                 }
@@ -1533,8 +1780,8 @@
              */
             cloneWithSize(newW, newH) {
                 const newGame = new Konane(newW, newH);
-                if (this._black != 0 || this._white != 0) {
-                    for (let y = 0; y < this._height; ++y) {
+                if (this._black != 0n || this._white != 0n) {
+                    for (let y = 0n; y < this._height; ++y) {
                         newGame._black |= ((this._black & this._rowMask(y)) >> (this.width * y)) << (y * newW);
                         newGame._white |= ((this._white & this._rowMask(y)) >> (this.width * y)) << (y * newW);
                     }
@@ -1552,6 +1799,15 @@
                 return newGame;
             }
         }
+
+        test("Konane.canonicalForm integration - failure on 12/23/2024", (t) => {
+            const g = Konane.fromString('xo_ox\noxo__\nx_xox\noxoxo');
+            window.TEST = 1;
+            const value = g.canonicalForm();
+
+            t.assert(value instanceof NumberUpStar);
+            t.assertEq(value, new NumberUpStar(0, 1, 0));
+        })
     </script>
 
     <template id="template-konane">
@@ -1620,19 +1876,23 @@
             }
 
             @keyframes shake {
+
                 10%,
                 90% {
                     transform: translate3d(-1px, 1px, 0);
                 }
+
                 20%,
                 80% {
                     transform: translate3d(2px, -1px, 0);
                 }
+
                 30%,
                 50%,
                 70% {
                     transform: translate3d(-2px, 1px, 0);
                 }
+
                 40%,
                 60% {
                     transform: translate3d(2px, -1px, 0);
@@ -1659,7 +1919,7 @@
         // Konane Game HTML Element
         class KonaneHTMLElement extends HTMLElement {
             static get observedAttributes() {
-                return ["player", "turn"];
+                return ["player", "turn", "calculate-value"];
             }
 
             #innerTextObserver = new MutationObserver(() => {
@@ -1671,6 +1931,7 @@
             #history = [];
             #historyIdx = -1;
             #activeCell = null;
+            #calculateValue = true
 
             static fromGame(game) {
                 let elem = new KonaneHTMLElement();
@@ -1690,6 +1951,7 @@
                 shadowRoot.appendChild(root);
 
                 this.#interactiveColor = requireStateString(this.getAttribute("player") ?? "black");
+                this.#calculateValue = !!(this.getAttribute("calculate-value") ?? true);
                 this.refreshBoardState();
             }
 
@@ -1744,7 +2006,9 @@
             }
 
             updateValue() {
-                this.shadowRoot.getElementById("value").innerHTML = this.game.canonicalForm().toString();
+                if (this.#calculateValue) {
+                    this.shadowRoot.getElementById("value").innerHTML = this.game.canonicalForm().toString();
+                }
             }
 
             activateCell(x, y) {
@@ -1790,7 +2054,7 @@
 
                 const currentPlayerHasMoves = !this.game.moves(this.currentPlayer).allMoves().next().done;
                 if (!currentPlayerHasMoves) {
-                    this.dispatchEvent(new CustomEvent("game-complete", { detail: { winner: this.currentPlayer == "black" ? "white" : "black" } } ));
+                    this.dispatchEvent(new CustomEvent("game-complete", { detail: { winner: this.currentPlayer == "black" ? "white" : "black" } }));
                 }
 
                 if (this.currentPlayer != this.#interactiveColor) {
@@ -1835,6 +2099,11 @@
                 let best = [0, options[0].canonicalForm()];
                 for (const i in options) {
                     const canon = options[i].canonicalForm();
+                    const cmpZero = canon.partialCompare(new NumberUpStar(0, 0, 0));
+                    if (cmpZero < 0 || cmpZero == null) {
+                        return i;
+                    }
+
                     const cmp = canon.partialCompare(best[1]);
                     if (this.currentPlayer == "black" && cmp > 0) {
                         best = [i, canon];
@@ -1867,7 +2136,7 @@
                         .filter(m => m.fromX == fromX && m.fromY == fromY)
                         .forEach(m => this.proposeMove(m));
                     window.setTimeout(() => {
-                        this.applyMove(moves[chosenMove]);
+                        this.applyMove(moves[chosenMove], this.currentPlayer);
                     }, 1000)
                 }, 350)
             }
@@ -1993,7 +2262,7 @@
                     <div class="hint">
                         HINT: Try clicking or tapping on one of the black circles.
                     </div>
-                    <br/>
+                    <br />
                     <div>
                         <span style="font-weight: bolder;" id="intro-game-winner"></span>
                     </div>
@@ -2024,25 +2293,43 @@
                 The first player unable to make a move loses.
             </p>
             <p style="text-align: center;">Try playing on the above board a bit to get a feel for the game.</p>
+            <div style="height: 12pt;"></div>
 
-            <div style="height: 12pt;"></div>
-            <hr style="width: 120%; margin-left: -10%;"/>
-            <div style="height: 12pt;"></div>
             <p>Any number of jumps can be made in a single direction.
                 For example, in this game you (black), can capture 1, 2, 3, or 4 white pieces.
             </p>
             <div style="display: flex; justify-content: center;">
-                <irs-konane style="padding: 4pt" id="game-long-jump" >
+                <irs-konane style="padding: 4pt" id="game-long-jump">
                     __
                     __
                     xo_o_o_o_
                     __
                 </irs-konane>
             </div>
+
+            <p>Finally, here's a full board - have fun!</p>
+            <irs-konane style="padding: 4pt" id="full-5x5" calculate-value="false">
+                xoxox
+                oxoxo
+                x__ox
+                oxoxo
+            </irs-konane>
         </section>
 
+        <hr style="width: 120%; margin-left: -10%; margin-top: 16pt; margin-bottom: 12pt;" />
 
+        <section id="linear-games">
+            <h2>Linear Games</h2>
+
+            <p>
+
+            </p>
+        </section>
     </main>
+
+
+
+
     <div style="display: flex; flex-flow: row wrap;" id="child-games"></div>
     <template id="template-game-children">
         <style>
@@ -2083,8 +2370,8 @@
     </template>
     <script>
         function withMoves(game, fn) {
-            let l = [...game.moves("black").allMoves()].map(m => { const lm = game.clone(); lm.applyMove(m); return lm; });
-            let r = [...game.moves("white").allMoves()].map(m => { const lm = game.clone(); lm.applyMove(m); return lm; });
+            let l = [...game.moves("black").allMoves()].map(m => { const lm = game.clone(); lm.applyMove(m, "black"); return lm; });
+            let r = [...game.moves("white").allMoves()].map(m => { const lm = game.clone(); lm.applyMove(m, "white"); return lm; });
             return fn(l, r)
         }
 
@@ -2105,6 +2392,8 @@
             }
             document.getElementById("child-games").appendChild(elem);
         }
+
+        runTests();
     </script>
 </body>
 
