@@ -2295,78 +2295,18 @@
             }
         }
 
-        class CGTGameControl extends HTMLButtonElement {
-            static observedAttributes = ["for", "type"]
-            #target = new TargetElement((oldElem, newElem) => { })
-
-            /** @type {"undo" | "redo" | "reset" | "none"} */
-            #function = null;
-            #icons = {
-                "undo": "⟵",
-                "redo": "⟶",
-                "reset": "⟳",
-                "none": "?"
-            }
-            #button
-
-            constructor() {
-                super()
-                this.addEventListener("click", (_ev) => this.#handleClick());
-
-            }
-
-            #handleClick() {
-                if (this.#target.element === null) {
-                    console.warn("click before target element was found");
-                    return;
-                }
-
-                if (!(this.#target.element instanceof KonaneHTMLElement)) {
-                    console.warn("target element is not a konane game");
-                    return;
-                }
-                switch (this.#function) {
-                    case "none": {   
-                        break;
-                    }
-                    case "redo": {
-                        this.#target.element?.redo();
-                        break;
-                    }
-                    case "undo": {
-                        this.#target.element?.undo();
-                        break;
-                    }
-                    case "reset": {
-                        this.#target.element?.reset();
-                        break;
-                    }
-                }
-            }
-
-            #updateFunction(func) {
-                if (!["undo", "redo", "reset", "none"].includes(func)) {
-                    console.warn("invalid function: ", func);
-                    return;
-                }
-
-                this.#function = func;
-                this.innerHTML = `<span>${this.#icons[func]}</span>`;
-            }
-
-            attributeChangedCallback(attr, oldVal, newVal) {
-                if (attr === "for") {
-                    this.#target.target(newVal);
-                }
-                if (attr === "type") {
-                    this.#updateFunction(newVal)
-                }
-            }
-        }
-
         customElements.define("cgt-konane", KonaneHTMLElement);
         customElements.define("cgt-value", CGTValue);
-        customElements.define("cgt-control", CGTGameControl, { extends: "button" });
+
+        function undo(elem) {
+            document.querySelector(elem)?.undo();
+        }
+        function redo(elem) {
+            document.querySelector(elem)?.redo();
+        }
+        function reset(elem) {
+            document.querySelector(elem)?.reset();
+        }
     </script>
 
     <style class="global">
@@ -2490,6 +2430,45 @@
             margin: auto;
             display: inline-block;
         }
+
+        button.undo::before {
+            content: "⟵";
+            padding: 0 4pt 0 4pt;
+        }
+
+        button.reset::before {
+            content: "⟳";
+            padding: 0 4pt 0 4pt;
+        }
+
+        button.redo::after {
+            content: "⟶";
+            padding: 0 4pt 0 4pt;
+        }
+
+        .game-toolbar-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr 6fr;
+            grid-template-rows: 1fr;
+            align-items: center;
+            column-gap: 8pt;
+            padding-right: 2em;
+            padding-left: 2em;
+        }
+
+        .game-toolbar-row button {
+            width: 100%;
+        }
+
+        .game-toolbar-row cgt-value {
+            text-align: right;
+        }
+
+        .flex-column-center {
+            display: flex;
+            flex-flow: column;
+            justify-content: center;
+        }
     </style>
 
 </head>
@@ -2510,22 +2489,21 @@
                     </div>
 
                 </div>
-                <div>
-                    <div style="display: flex; flex-flow: column; justify-content: center;">
-                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 6fr; grid-template-rows: 1fr; align-items: center; column-gap: 8pt; padding-right: 2em; padding-left: 2em;">
-                            <button is="cgt-control" for="#intro-game" type="undo" style="width: 100%"></button>
-                            <button is="cgt-control" for="#intro-game" type="reset" style="width: 100%"></button>
-                            <button is="cgt-control" for="#intro-game" type="redo" style="width: 100%"></button>
-                            <cgt-value for="#intro-game" style="text-align: right;"></cgt-value>
-                        </div>
-                        <cgt-konane id="intro-game" controls="right">
-                            ____
-                            _xo_
-                            __xo_
-                            _____
-                        </cgt-konane>
+                <div class="flex-column-center">
+                    <div class="game-toolbar-row">
+                        <button class="undo" onclick="undo('#intro-game')"></button>
+                        <button class="reset" onclick="reset('#intro-game')"></button>
+                        <button class="redo" onclick="redo('#intro-game')"></button>
+                        <cgt-value for="#intro-game"></cgt-value>
                     </div>
+                    <cgt-konane id="intro-game" controls="right">
+                        ____
+                        _xo_
+                        __xo_
+                        _____
+                    </cgt-konane>
                 </div>
+
                 <script>
                     document.getElementById("intro-game").addEventListener("game-complete", ev => {
                         if (ev.detail.winner == "black") {
@@ -2555,23 +2533,24 @@
                 <cgt-konane style="padding: 4pt; flex-grow: 1" id="game-long-jump" controls="bottom">
                     xo_o_o_o_
                 </cgt-konane>
-                <button is="cgt-control" for="#game-long-jump" style="line-height: 2rem;" type="reset"></button>
+                <button class="reset" onclick="reset('#intro-final-game')"></button>
             </div>
 
             <p>Finally, here's a full board - have fun!</p>
-            <div style="display: flex; flex-flow: column; justify-content: center;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 6fr; grid-template-rows: 1fr; align-items: center; column-gap: 8pt; padding-right: 2em; padding-left: 2em;">
-                    <button is="cgt-control" for="#full-5x5" type="undo" style="width: 100%"></button>
-                    <button is="cgt-control" for="#full-5x5" type="reset" style="width: 100%"></button>
-                    <button is="cgt-control" for="#full-5x5" type="redo" style="width: 100%"></button>
-                    <cgt-value for="#full-5x5" style="text-align: right;"></cgt-value>
+            <div class="flex-column-center">
+                <div class="game-toolbar-row">
+                    <button class="undo" onclick="undo('#intro-final-game')"></button>
+                    <button class="reset" onclick="reset('#intro-final-game')"></button>
+                    <button class="redo" onclick="redo('#intro-final-game')"></button>
+                    <cgt-value for="#intro-game"></cgt-value>
                 </div>
-                <cgt-konane id="full-5x5" style="flex-grow: 1" >
+                <cgt-konane id="intro-final-game" style="flex-grow: 1">
                     xoxo
                     oxoxo
                     x__ox
                 </cgt-konane>
             </div>
+
         </section>
 
         <hr style="width: 120%; margin-left: -10%; margin-top: 16pt; margin-bottom: 12pt;" />
