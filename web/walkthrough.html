@@ -1813,8 +1813,6 @@
     </script>
 
     <template id="template-konane">
-        <link rel="stylesheet" class="global"
-            href="https://cdnjs.cloudflare.com/ajax/libs/concrete.css/3.0.0/concrete.min.css" />
         <style>
             #board {
                 display: grid;
@@ -1822,12 +1820,18 @@
                 grid-template-rows: repeat(var(--konane-height), 1fr);
                 background-color: var(--bg);
                 aspect-ratio: var(--konane-width) / var(--konane-height);
-                grid-area: board;
+                min-height: 0;
+                min-width: 0;
+                flex: 1 1 auto;
+
+
             }
 
             .cell {
                 border: 1px solid var(--fg);
-                padding: 10%;
+                min-width: 1rem;
+                min-height: 1rem;
+                padding: max(.3rem, 10%);
             }
 
             .highlight {
@@ -1858,40 +1862,56 @@
                 padding: 8pt;
                 display: grid;
                 column-gap: 4pt;
+                row-gap: 4pt;
                 align-items: center;
+                grid-auto-columns: 1fr;
+                grid-auto-rows: 1fr;
+                min-height: 0;
+                min-width: 0;
+
+                flex: 0.2 1 auto;
             }
-            .ctrl-left #controls, .ctrl-right #controls {
-                grid-template-rows: 1fr 1fr 1fr;
+
+            .ctrl-left #controls,
+            .ctrl-right #controls {
+                grid-auto-flow: row;
             }
+
             .ctrl-none #controls {
                 display: none;
             }
-            .ctrl-bottom #controls, .ctrl-top #controls {
-                grid-template-columns: 1fr 1fr 1fr;
+
+            .ctrl-bottom #controls,
+            .ctrl-top #controls {
+                grid-auto-flow: column;
             }
 
             #game {
-                display: grid;
+                display: flex;
                 align-items: center;
                 justify-content: center;
+                min-width: 0;
+                min-height: 0;
             }
 
             #game.ctrl-left {
-                grid-template: "ctrl board" minmax(4em, 100%) / minmax(2em, 20%) minmax(4em, 80%);
+                flex-direction: row-reverse;
             }
+
             #game.ctrl-right {
-                grid-template: "board ctrl" minmax(4em, 100%) / minmax(4em, 80%) minmax(2em, 20%);
+                flex-direction: row;
             }
+
             #game.ctrl-top {
-                grid-template: "ctrl"  minmax(2em, 20%)
-                               "board" minmax(4em, 80%) / minmax(4em, 100%);
+                flex-direction: column-reverse;
             }
+
             #game.ctrl-bottom {
-                grid-template: "board" minmax(4em, 80%)
-                               "ctrl" minmax(2em, 20%) / minmax(4em, 100%);
+                flex-direction: column;
             }
+
             #game.ctrl-none {
-                grid-template: "board" / minmax(4em, 100%);
+                grid-template: "board" / auto;
             }
 
 
@@ -1924,7 +1944,14 @@
             }
 
             button {
-                /* aspect-ratio: 1; */
+                padding: .2rem .4rem;
+                font-size: 1.2rem;
+                font-weight: normal;
+                background: var(--bg);
+                color: var(--fg);
+                border: .1rem solid var(--fg);
+                border-radius: 0;
+                cursor: pointer;
             }
         </style>
         <div id="game" class="ctrl-bottom">
@@ -2119,7 +2146,7 @@
             }
 
             undo() {
-                if (this.#historyIdx < 0) {
+                if (this.#historyIdx <= 0) {
                     return;
                 }
 
@@ -2314,9 +2341,56 @@
         customElements.define("cgt-value", CGTValue);
     </script>
 
+    <style class="global">
+        /* Inherited from Concrete CSS */
+        :root {
+            --fg: #111;
+            --bg: #fff;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --fg: #fff;
+                --bg: #111;
+            }
+        }
 
-    <link rel="stylesheet" class="global"
-        href="https://cdnjs.cloudflare.com/ajax/libs/concrete.css/3.0.0/concrete.min.css">
+        html {
+            font-size: 1.25rem;
+            box-sizing: border-box;
+        }
+
+        p {
+            text-wrap: pretty;
+        }
+
+        *,
+        ::after,
+        ::before {
+            box-sizing: inherit;
+            text-decoration-thickness: .1rem;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--fg);
+            font-family: Helvetica, Arial, sans-serif;
+        }
+
+        main section+section {
+            padding: 2rem 0;
+        }
+
+        body>header,
+        body>main,
+        body>footer {
+            margin: auto;
+            max-width: 800px;
+            padding-left: 10px;
+            padding-right: 10px;
+            width: 100%;
+        }
+    </style>
 
     <style>
         .side-by-side {
@@ -2327,6 +2401,10 @@
             padding: 1em;
         }
 
+        .side-by-side > * {
+            max-width: 400px;
+        }
+
         .hint {
             color: gray;
             max-width: 200px;
@@ -2334,6 +2412,32 @@
 
         #intro-game {
             min-width: 300px;
+        }
+
+        cgt-value {
+            padding: .5rem;
+            font-size: 1.5rem;
+        }
+        irs-konane.inline-left {
+            float: left;
+            padding-right: 1.5rem;
+        }
+        irs-konane.inline-right {
+            float: right;
+            padding-left: 2rem
+        }
+        irs-konane {
+            padding: 10pt;
+            display: block;
+        }
+        .fig-size1 {
+            width: 8rem;
+        }
+        .fig-size2 {
+            width: 12rem;
+        }
+        .fig-size3 {
+            width: 16rem;
         }
     </style>
 
@@ -2353,15 +2457,17 @@
                     <div>
                         <span style="font-weight: bolder;" id="intro-game-winner"></span>
                     </div>
-                    <cgt-value for="#intro-game" ></cgt-value>
 
                 </div>
-                <irs-konane id="intro-game" controls="right">
-                    ____
-                    _xo_
-                    __xo_
-                    _____
-                </irs-konane>
+                <div>
+                    <cgt-value for="#intro-game"></cgt-value>
+                    <irs-konane id="intro-game" controls="right">
+                        ____
+                        _xo_
+                        __xo_
+                        _____
+                    </irs-konane>
+                </div>
                 <script>
                     document.getElementById("intro-game").addEventListener("game-complete", ev => {
                         if (ev.detail.winner == "black") {
@@ -2394,11 +2500,13 @@
             </div>
 
             <p>Finally, here's a full board - have fun!</p>
-            <irs-konane style="padding: 4pt" id="full-5x5" calculate-value="false">
-                xoxo
-                oxoxo
-                x__ox
-            </irs-konane>
+            <div style="display: block; padding: 8pt 6em 8pt 6em;">
+                <irs-konane id="full-5x5">
+                    xoxo
+                    oxoxo
+                    x__ox
+                </irs-konane>
+            </div>
         </section>
 
         <hr style="width: 120%; margin-left: -10%; margin-top: 16pt; margin-bottom: 12pt;" />
@@ -2420,30 +2528,53 @@
             <p>
                 However, it can still be fun (and useful!) to just look at small sections of games.
             </p>
-            <irs-konane style="min-width: 300px; max-width: 300px" controls="bottom">
+            <irs-konane controls="bottom">
                 _xoxoxo_
             </irs-konane>
+
+            
             <p>
                 This is a simple linear pattern.
                 By analyzing the game we can determine who wins just by the number of white and black pieces.
+                Let's start with some simple games.
             </p>
-            <div class="side-by-side">
-                <irs-konane controls="none">
+            <p>
+                <irs-konane class="inline-left fig-size2" controls="none">
                     _xo_
                 </irs-konane>
-                <p>
-                    This one's easy. Whoever goes first captures the other players piece.
-                    With their only piece gone the other player loses.
-                </p>
-            </div>
-            <div class="side-by-side">
-                <p>
-                    Another boring game, black can't even move!
-                </p>
-                <irs-konane player="white" turn="white" controls="none">
+                When we're just playing with two pieces it's pretty easy.
+                Whoever goes first captures the other player's piece.
+                With their only piece gone the other player loses.
+            </p>
+            <p>
+                <irs-konane class="inline-right fig-size3" player="white" turn="white" controls="none">
                     _xox_
                 </irs-konane>
+                Playing with three pieces isn't much more exciting.
+                Black can't move at all, so if they play first they'll lose instantly.
+            </p>
+
+            <p>
+                Let's cut to the chase: drag the slider to create a game with <i>N</i> pieces:
+            </p>
+            <div style="display: grid; grid-template-columns: 6fr 1fr;column-gap: 1em">
+                <input type="range" min="1" max="10" value="4" id="slp-range" onchange="updateSLPVariable()">
+                <cgt-value for="#slp-variable"></cgt-value>
             </div>
+            <irs-konane style="height: 8em" controls="none" id="slp-variable">
+                _xo_
+            </irs-konane>
+
+            <script>
+                function updateSLPVariable() {
+                    const fullGame = "xoxoxoxoxo";
+                    const n = document.getElementById("slp-range").value;
+                    const sect = fullGame.slice(0, n) + "_".repeat(fullGame.length - n);
+                    document.getElementById("slp-variable").innerText = "_" + sect + "_";
+                }
+                updateSLPVariable()
+            </script>
+        
         </section>
     </main>
 </body>
