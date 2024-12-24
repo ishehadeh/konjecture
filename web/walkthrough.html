@@ -378,7 +378,7 @@
                         }
                     }
                 }
-                
+
                 if (!isGt && !isLt) {
                     // !(this < rhs) && !(this > rhs) ==> this == rhs
                     return 0;
@@ -826,11 +826,13 @@
                 if (this.up != 0n) {
                     if (str) { str += " + " }
                     if (this.up != 1n && this.up != -1n) {
-                        str += this.up.toString();
-                    } else if (this.up == -1n) {
-                        str += "-"
+                        str += absBigInt(this.up).toString();
                     }
-                    str += "^";
+                    if (this.up > 0) {
+                        str += "↑";
+                    } else {
+                        str += "↓";
+                    }
                 }
                 if (this.star != 0n) {
                     if (str) { str += " + " }
@@ -1278,7 +1280,7 @@
             const d = cf([c], [a]);
             const e = cf([0], [d]);
 
-            t.assertEq(canonicalForm([new DyadicRational(5,1)], [4]), new DyadicRational(3));
+            t.assertEq(canonicalForm([new DyadicRational(5, 1)], [4]), new DyadicRational(3));
 
             t.assertEq(c.partialCompare(new DyadicRational(11, 2)), -1);
             t.assertEq(c.partialCompare(new DyadicRational(1, 1)), 1);
@@ -1820,6 +1822,7 @@
                 grid-template-rows: repeat(var(--konane-height), 1fr);
                 background-color: var(--bg);
                 aspect-ratio: var(--konane-width) / var(--konane-height);
+                grid-area: board;
             }
 
             .cell {
@@ -1851,25 +1854,46 @@
             }
 
             #controls {
+                grid-area: ctrl;
                 padding: 8pt;
                 display: grid;
-                grid-template-rows: 1fr 1fr 1fr;
                 column-gap: 4pt;
+                align-items: center;
             }
-
-            #value {
-                font-size: 20pt;
-                grid-column: span 2;
-                flex-basis: 100%;
-                padding-top: 0.5em;
-                text-align: left;
-                padding-left: 1em;
+            .ctrl-left #controls, .ctrl-right #controls {
+                grid-template-rows: 1fr 1fr 1fr;
+            }
+            .ctrl-none #controls {
+                display: none;
+            }
+            .ctrl-bottom #controls, .ctrl-top #controls {
+                grid-template-columns: 1fr 1fr 1fr;
             }
 
             #game {
                 display: grid;
-                grid-template-columns: 4fr 1fr;
+                align-items: center;
+                justify-content: center;
             }
+
+            #game.ctrl-left {
+                grid-template: "ctrl board" minmax(4em, 100%) / minmax(2em, 20%) minmax(4em, 80%);
+            }
+            #game.ctrl-right {
+                grid-template: "board ctrl" minmax(4em, 100%) / minmax(4em, 80%) minmax(2em, 20%);
+            }
+            #game.ctrl-top {
+                grid-template: "ctrl"  minmax(2em, 20%)
+                               "board" minmax(4em, 80%) / minmax(4em, 100%);
+            }
+            #game.ctrl-bottom {
+                grid-template: "board" minmax(4em, 80%)
+                               "ctrl" minmax(2em, 20%) / minmax(4em, 100%);
+            }
+            #game.ctrl-none {
+                grid-template: "board" / minmax(4em, 100%);
+            }
+
 
             .active {
                 animation: shake 1s cubic-bezier(.36, .07, .19, .97) infinite;
@@ -1900,18 +1924,16 @@
             }
 
             button {
-                aspect-ratio: 1;
-                max-width: fit-content;
+                /* aspect-ratio: 1; */
             }
         </style>
-        <div id="game">
+        <div id="game" class="ctrl-bottom">
             <div id="board"></div>
             <div id="controls">
                 <button id="prev">⏮</button>
                 <button id="reset">⟲</button>
                 <button id="next">⏭</button>
             </div>
-            <div id="value"></div>
         </div>
     </template>
 
@@ -1919,7 +1941,7 @@
         // Konane Game HTML Element
         class KonaneHTMLElement extends HTMLElement {
             static get observedAttributes() {
-                return ["player", "turn", "calculate-value"];
+                return ["player", "turn", "controls"];
             }
 
             #innerTextObserver = new MutationObserver(() => {
@@ -1931,7 +1953,6 @@
             #history = [];
             #historyIdx = -1;
             #activeCell = null;
-            #calculateValue = true
 
             static fromGame(game) {
                 let elem = new KonaneHTMLElement();
@@ -1950,9 +1971,33 @@
                 shadowRoot.adoptedStyleSheets.push(this.#runtimeStyles);
                 shadowRoot.appendChild(root);
 
-                this.#interactiveColor = requireStateString(this.getAttribute("player") ?? "black");
-                this.#calculateValue = !!(this.getAttribute("calculate-value") ?? true);
                 this.refreshBoardState();
+            }
+
+            attributeChangedCallback(name, oldValue, newValue) {
+                switch (name) {
+                    case "player":
+                        this.#interactiveColor = newValue ?? "black";
+                        break;
+                    case "turn":
+                        this.#history = [[this.game.clone(), newValue]];
+                        this.#proposedMoves = [];
+                        this.#historyIdx = 0;
+                        this.createAllTiles();
+                        this.updateValue();
+                        this.dispatchEvent(new CustomEvent("game-init", { detail: { state: this.game.clone() } }));
+                        break;
+                    case "controls": {
+                        const values = ["left", "right", "top", "bottom", "none"];
+                        const classNames = values.map(ctrl => `ctrl-${ctrl}`);
+                        if (!["left", "right", "top", "bottom", "none"].includes(newValue)) {
+                            console.warn("invalid value for controls attribute")
+                        } else {
+                            this.shadowRoot.getElementById("game")?.classList.remove(...classNames);
+                            this.shadowRoot.getElementById("game")?.classList.add(`ctrl-${newValue}`);
+                        }
+                    }
+                }
             }
 
             connectedCallback() {
@@ -2006,9 +2051,7 @@
             }
 
             updateValue() {
-                if (this.#calculateValue) {
-                    this.shadowRoot.getElementById("value").innerHTML = this.game.canonicalForm().toString();
-                }
+                this.dispatchEvent(new CustomEvent("game-update", { detail: { player: this.currentPlayer, state: this.game } }));
             }
 
             activateCell(x, y) {
@@ -2228,7 +2271,47 @@
             }
         }
 
+        class CGTValue extends HTMLElement {
+            static observedAttributes = ["for"]
+
+            #watchedSelector = null;
+            #watchedElem = null;
+            #eventListener = (ev) => this.#updateFromGameState(ev.detail.state);
+            #elemObserver = new MutationObserver((_) => {
+                this.#tryUpdateWatchedElem();
+            });
+
+            constructor() {
+                super();
+            }
+
+            #tryUpdateWatchedElem() {
+                this.#watchedElem ??= document.querySelector(this.#watchedSelector);
+                if (this.#watchedElem !== null) {
+                    this.#elemObserver.disconnect();
+                    this.#updateFromGameState(this.#watchedElem.game);
+                    this.#watchedElem.addEventListener("game-update", this.#eventListener);
+                } else {
+                    this.#elemObserver.observe(document.body, { childList: true, subtree: true });
+                }
+            }
+
+            #updateFromGameState(state) {
+                const cf = state.canonicalForm();
+                this.innerText = cf.toString();
+            }
+
+            attributeChangedCallback(attr, oldVal, newVal) {
+                if (attr === "for") {
+                    this.#watchedElem?.removeEventListener("game-update", this.#eventListener)
+                    this.#watchedSelector = newVal;
+                    this.#tryUpdateWatchedElem();
+                }
+            }
+        }
+
         customElements.define("irs-konane", KonaneHTMLElement);
+        customElements.define("cgt-value", CGTValue);
     </script>
 
 
@@ -2237,9 +2320,8 @@
 
     <style>
         .side-by-side {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            flex-direction: row;
+            display: flex;
+            flex-flow: row wrap;
             justify-content: center;
             column-gap: 2em;
             padding: 1em;
@@ -2247,6 +2329,11 @@
 
         .hint {
             color: gray;
+            max-width: 200px;
+        }
+
+        #intro-game {
+            min-width: 300px;
         }
     </style>
 
@@ -2266,8 +2353,10 @@
                     <div>
                         <span style="font-weight: bolder;" id="intro-game-winner"></span>
                     </div>
+                    <cgt-value for="#intro-game" ></cgt-value>
+
                 </div>
-                <irs-konane id="intro-game">
+                <irs-konane id="intro-game" controls="right">
                     ____
                     _xo_
                     __xo_
@@ -2289,7 +2378,7 @@
             <p>
                 Konane is a 2 player ancient Hawaiian game played on a rectangular grid.
                 One player uses black pieces, and the other white pieces.
-                To move a piece, a player must jump over one of their opponents pieces.
+                To move a piece, a player must jump over one of their opponent's pieces.
                 The first player unable to make a move loses.
             </p>
             <p style="text-align: center;">Try playing on the above board a bit to get a feel for the game.</p>
@@ -2298,103 +2387,65 @@
             <p>Any number of jumps can be made in a single direction.
                 For example, in this game you (black), can capture 1, 2, 3, or 4 white pieces.
             </p>
-            <div style="display: flex; justify-content: center;">
-                <irs-konane style="padding: 4pt" id="game-long-jump">
-                    __
-                    __
+            <div>
+                <irs-konane style="padding: 4pt" id="game-long-jump" controls="bottom">
                     xo_o_o_o_
-                    __
                 </irs-konane>
             </div>
 
             <p>Finally, here's a full board - have fun!</p>
             <irs-konane style="padding: 4pt" id="full-5x5" calculate-value="false">
-                xoxox
+                xoxo
                 oxoxo
                 x__ox
-                oxoxo
             </irs-konane>
         </section>
 
         <hr style="width: 120%; margin-left: -10%; margin-top: 16pt; margin-bottom: 12pt;" />
 
         <section id="linear-games">
-            <h2>Linear Games</h2>
+            <h2>Numbers and Konane</h2>
 
             <p>
-
+                That text under the board - "1", "*", maybe even "↓" - is the game's "value".
+                It's an abstract way to describe a two player game, basically a number to say how "good" the game is for
+                each player.
+                It doesn't take all the fun out of it though!
+                <span style="opacity: 40%; font-size: 0.8em">(un)</span>fortunately for us the game is too complex to
+                fully analyze.
+                That's why the games above were so small, any bigger and your browser would start to complain about this
+                page not responding.
             </p>
+
+            <p>
+                However, it can still be fun (and useful!) to just look at small sections of games.
+            </p>
+            <irs-konane style="min-width: 300px; max-width: 300px" controls="bottom">
+                _xoxoxo_
+            </irs-konane>
+            <p>
+                This is a simple linear pattern.
+                By analyzing the game we can determine who wins just by the number of white and black pieces.
+            </p>
+            <div class="side-by-side">
+                <irs-konane controls="none">
+                    _xo_
+                </irs-konane>
+                <p>
+                    This one's easy. Whoever goes first captures the other players piece.
+                    With their only piece gone the other player loses.
+                </p>
+            </div>
+            <div class="side-by-side">
+                <p>
+                    Another boring game, black can't even move!
+                </p>
+                <irs-konane player="white" turn="white" controls="none">
+                    _xox_
+                </irs-konane>
+            </div>
         </section>
     </main>
-
-
-
-
-    <div style="display: flex; flex-flow: row wrap;" id="child-games"></div>
-    <template id="template-game-children">
-        <style>
-            .wrapper {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                grid-template-rows: min-content min-content max-content;
-                width: 100%;
-                margin: auto;
-                column-gap: 1em;
-            }
-
-            #original {
-                grid-column: span 2;
-                width: 40%;
-                margin: auto;
-
-            }
-
-            .gamelist {
-                display: flex;
-                flex-direction: column;
-            }
-        </style>
-        <div class="wrapper">
-            <hr />
-            <irs-konane id="original"></irs-konane>
-
-            <h1>Left</h1>
-            <h1>Right</h1>
-
-            <div id="left-moves" class="gamelist">
-            </div>
-
-            <div id="right-moves" class="gamelist">
-            </div>
-        </div>
-    </template>
-    <script>
-        function withMoves(game, fn) {
-            let l = [...game.moves("black").allMoves()].map(m => { const lm = game.clone(); lm.applyMove(m, "black"); return lm; });
-            let r = [...game.moves("white").allMoves()].map(m => { const lm = game.clone(); lm.applyMove(m, "white"); return lm; });
-            return fn(l, r)
-        }
-
-        function addChildMovesOf(game, id = null) {
-            const template = document.getElementById("template-game-children").content;
-            const elem = template.cloneNode(true);
-            elem.getElementById("original").innerHTML = game.toString();
-            withMoves(game, (gL, gR) => {
-                for (const l of gL) {
-                    elem.getElementById("left-moves").appendChild(KonaneHTMLElement.fromGame(l));
-                }
-                for (const r of gR) {
-                    elem.getElementById("right-moves").appendChild(KonaneHTMLElement.fromGame(r));
-                }
-            })
-            if (id != null) {
-                // elem.setAttribute("id", id.toString());
-            }
-            document.getElementById("child-games").appendChild(elem);
-        }
-
-        runTests();
-    </script>
 </body>
 
 
