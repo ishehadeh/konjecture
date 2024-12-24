@@ -2347,7 +2347,7 @@
             }
         }
 
-        customElements.define("irs-konane", KonaneHTMLElement);
+        customElements.define("cgt-konane", KonaneHTMLElement);
         customElements.define("cgt-value", CGTValue);
     </script>
 
@@ -2428,15 +2428,15 @@
             padding: .5rem;
             font-size: 1.5rem;
         }
-        irs-konane.inline-left {
+        cgt-konane.inline-left {
             float: left;
             padding-right: 1.5rem;
         }
-        irs-konane.inline-right {
+        cgt-konane.inline-right {
             float: right;
             padding-left: 2rem
         }
-        irs-konane {
+        cgt-konane {
             padding: 10pt;
             display: block;
         }
@@ -2471,12 +2471,12 @@
                 </div>
                 <div>
                     <cgt-value for="#intro-game"></cgt-value>
-                    <irs-konane id="intro-game" controls="right">
+                    <cgt-konane id="intro-game" controls="right">
                         ____
                         _xo_
                         __xo_
                         _____
-                    </irs-konane>
+                    </cgt-konane>
                 </div>
                 <script>
                     document.getElementById("intro-game").addEventListener("game-complete", ev => {
@@ -2504,18 +2504,18 @@
                 For example, in this game you (black), can capture 1, 2, 3, or 4 white pieces.
             </p>
             <div>
-                <irs-konane style="padding: 4pt" id="game-long-jump" controls="bottom">
+                <cgt-konane style="padding: 4pt" id="game-long-jump" controls="bottom">
                     xo_o_o_o_
-                </irs-konane>
+                </cgt-konane>
             </div>
 
             <p>Finally, here's a full board - have fun!</p>
             <div style="display: block; padding: 8pt 6em 8pt 6em;">
-                <irs-konane id="full-5x5">
+                <cgt-konane id="full-5x5">
                     xoxo
                     oxoxo
                     x__ox
-                </irs-konane>
+                </cgt-konane>
             </div>
         </section>
 
@@ -2538,9 +2538,9 @@
             <p>
                 However, it can still be fun (and useful!) to just look at small sections of games.
             </p>
-            <irs-konane controls="bottom">
+            <cgt-konane controls="bottom">
                 _xoxoxo_
-            </irs-konane>
+            </cgt-konane>
 
             
             <p>
@@ -2549,17 +2549,17 @@
                 Let's start with some simple games.
             </p>
             <p>
-                <irs-konane class="inline-left fig-size2" controls="none">
+                <cgt-konane class="inline-left fig-size2" controls="none">
                     _xo_
-                </irs-konane>
+                </cgt-konane>
                 When we're just playing with two pieces it's pretty easy.
                 Whoever goes first captures the other player's piece.
                 With their only piece gone the other player loses.
             </p>
             <p>
-                <irs-konane class="inline-right fig-size3" player="white" turn="white" controls="none">
+                <cgt-konane class="inline-right fig-size3" player="white" turn="white" controls="none">
                     _xox_
-                </irs-konane>
+                </cgt-konane>
                 Playing with three pieces isn't much more exciting.
                 Black can't move at all, so if they play first they'll lose instantly.
             </p>
@@ -2571,9 +2571,9 @@
                 <input type="range" min="1" max="10" value="5" id="slp-range" onchange="updateSLPVariable()">
                 <cgt-value for="#slp-variable"></cgt-value>
             </div>
-            <irs-konane controls="none" player="white" turn="white" id="slp-variable">
+            <cgt-konane controls="none" player="white" turn="white" id="slp-variable">
                 _xoxoxoxoxo_
-            </irs-konane>
+            </cgt-konane>
 
             <script>
                 function updateSLPVariable() {
