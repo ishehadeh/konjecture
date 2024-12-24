@@ -2081,6 +2081,21 @@
                 this.dispatchEvent(new CustomEvent("game-update", { detail: { player: this.currentPlayer, state: this.game } }));
             }
 
+            createNewState(player = undefined) {
+                // we don't have any kind of fancy branching history,
+                // so if a new move is made while we're in the middle of the timeline
+                // remove any future moves.
+                if (this.#history.length > this.#historyIdx + 1) {
+                    this.#history = this.#history.slice(0, this.#historyIdx + 1);
+                }
+                this.clearProposedMoves();
+                if (player === undefined) {
+                    player = this.currentPlayer == "black" ? "white" : "black";
+                }
+                this.#history.push([this.game.clone(), player]);
+                this.#historyIdx += 1;
+            }
+
             activateCell(x, y) {
                 if (this.#activeCell != null) {
                     this._getTileNode(this.#activeCell[0], this.#activeCell[1])?.classList.remove("active");
@@ -2110,12 +2125,7 @@
                 if (!(move instanceof KonaneMove)) {
                     throw new TypeError(`expected an instance of KonaneMove, found ${move}`);
                 }
-                if (this.#history.length > this.#historyIdx + 1) {
-                    this.#history = this.#history.slice(0, this.#historyIdx + 1);
-                }
-                this.clearProposedMoves();
-                this.#history.push([this.game.clone(), this.currentPlayer == "black" ? "white" : "black"]);
-                this.#historyIdx += 1;
+                this.createNewState();
                 this.setTileState(move.toX, move.toY, this.game.getTile(move.fromX, move.fromY));
                 for (const { x, y } of move.clearedCells()) {
                     this.setTileState(x, y, "empty");
@@ -2558,11 +2568,11 @@
                 Let's cut to the chase: drag the slider to create a game with <i>N</i> pieces:
             </p>
             <div style="display: grid; grid-template-columns: 6fr 1fr;column-gap: 1em">
-                <input type="range" min="1" max="10" value="4" id="slp-range" onchange="updateSLPVariable()">
+                <input type="range" min="1" max="10" value="5" id="slp-range" onchange="updateSLPVariable()">
                 <cgt-value for="#slp-variable"></cgt-value>
             </div>
-            <irs-konane style="height: 8em" controls="none" id="slp-variable">
-                _xo_
+            <irs-konane controls="none" player="white" turn="white" id="slp-variable">
+                _xoxoxoxoxo_
             </irs-konane>
 
             <script>
@@ -2572,8 +2582,22 @@
                     const sect = fullGame.slice(0, n) + "_".repeat(fullGame.length - n);
                     document.getElementById("slp-variable").innerText = "_" + sect + "_";
                 }
+                document.getElementById("slp-variable").addEventListener("game-update", (ev) => {
+                    if (ev.detail.player != "black") return;
+                    const blackHasMoves = !ev.target.game.moves("black").allMoves().next().done;
+                    if (!blackHasMoves) {
+                        ev.target.createNewState("white");
+                    }
+                })
                 updateSLPVariable()
             </script>
+
+            <p>
+                Notice that the games with an odd number of pieces are all valued at some number less than zero.
+                That's a consequence of black having no moves.
+                No matter what move white makes, black can't ever move in these games. 
+                Try it! we'll your playing white in games above, and we'll skip black's turn if they don't have any moves.
+            </p>
         
         </section>
     </main>
