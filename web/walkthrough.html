@@ -1853,68 +1853,6 @@
                 aspect-ratio: 1;
             }
 
-            .icon {
-                font-size: 14pt;
-            }
-
-            #controls {
-                grid-area: ctrl;
-                padding: 8pt;
-                display: grid;
-                column-gap: 4pt;
-                row-gap: 4pt;
-                align-items: center;
-                grid-auto-columns: 1fr;
-                grid-auto-rows: 1fr;
-                min-height: 0;
-                min-width: 0;
-
-                flex: 0.2 1 auto;
-            }
-
-            .ctrl-left #controls,
-            .ctrl-right #controls {
-                grid-auto-flow: row;
-            }
-
-            .ctrl-none #controls {
-                display: none;
-            }
-
-            .ctrl-bottom #controls,
-            .ctrl-top #controls {
-                grid-auto-flow: column;
-            }
-
-            #game {
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                min-width: 0;
-                min-height: 0;
-            }
-
-            #game.ctrl-left {
-                flex-direction: row-reverse;
-            }
-
-            #game.ctrl-right {
-                flex-direction: row;
-            }
-
-            #game.ctrl-top {
-                flex-direction: column-reverse;
-            }
-
-            #game.ctrl-bottom {
-                flex-direction: column;
-            }
-
-            #game.ctrl-none {
-                grid-template: "board" / auto;
-            }
-
-
             .active {
                 animation: shake 1s cubic-bezier(.36, .07, .19, .97) infinite;
             }
@@ -1942,33 +1880,15 @@
                     transform: translate3d(2px, -1px, 0);
                 }
             }
-
-            button {
-                padding: .2rem .4rem;
-                font-size: 1.2rem;
-                font-weight: normal;
-                background: var(--bg);
-                color: var(--fg);
-                border: .1rem solid var(--fg);
-                border-radius: 0;
-                cursor: pointer;
-            }
         </style>
-        <div id="game" class="ctrl-bottom">
-            <div id="board"></div>
-            <div id="controls">
-                <button id="prev">⏮</button>
-                <button id="reset">⟲</button>
-                <button id="next">⏭</button>
-            </div>
-        </div>
+        <div id="board"></div>
     </template>
 
     <script>
         // Konane Game HTML Element
         class KonaneHTMLElement extends HTMLElement {
             static get observedAttributes() {
-                return ["player", "turn", "controls"];
+                return ["player", "turn"];
             }
 
             #innerTextObserver = new MutationObserver(() => {
@@ -2025,19 +1945,6 @@
                         }
                     }
                 }
-            }
-
-            connectedCallback() {
-                this.shadowRoot.getElementById("next").addEventListener("click", () => {
-                    this.redo();
-                })
-                this.shadowRoot.getElementById("prev").addEventListener("click", () => {
-                    this.undo();
-                })
-
-                this.shadowRoot.getElementById("reset").addEventListener("click", () => {
-                    this.refreshBoardState();
-                })
             }
 
             refreshBoardState() {
@@ -2163,6 +2070,10 @@
                 this.#historyIdx -= 1;
                 this.createAllTiles();
                 this.updateValue();
+            }
+
+            reset() {
+                this.refreshBoardState();
             }
 
             redo() {
@@ -2308,29 +2219,68 @@
             }
         }
 
-        class CGTValue extends HTMLElement {
-            static observedAttributes = ["for"]
-
+        /** A class which holds an element selected using a query selector
+         * 
+         * If the element isn't immediately available, then the DOM is monitored until it appears
+         */
+        class TargetElement {
             #watchedSelector = null;
             #watchedElem = null;
-            #eventListener = (ev) => this.#updateFromGameState(ev.detail.state);
             #elemObserver = new MutationObserver((_) => {
                 this.#tryUpdateWatchedElem();
             });
+            #callback
 
-            constructor() {
-                super();
+            /**
+             * @param {(oldElem: HTMLElement | null, newElem: HTMLElement) => void} targetChangeCb
+             */
+            constructor(targetChangeCb) {
+                this.#callback = targetChangeCb
+            }
+
+            /** @type {HTMLElement | null } */
+            get element() { return this.#watchedElem }
+
+            /** target the first element that matches the given query selector
+             * @param {string} selector
+             */
+            target(selector) {
+                if (typeof selector !== "string") {
+                    throw new TypeError(`expected string, got "${selector}" [type: ${typeof selector}]`)
+                }
+
+                this.#watchedSelector = selector;
+                this.#tryUpdateWatchedElem();
             }
 
             #tryUpdateWatchedElem() {
+                const oldWatchedElem = this.#watchedElem;
                 this.#watchedElem ??= document.querySelector(this.#watchedSelector);
                 if (this.#watchedElem !== null) {
                     this.#elemObserver.disconnect();
-                    this.#updateFromGameState(this.#watchedElem.game);
-                    this.#watchedElem.addEventListener("game-update", this.#eventListener);
+                    this.#callback(oldWatchedElem, this.#watchedElem);
                 } else {
                     this.#elemObserver.observe(document.body, { childList: true, subtree: true });
                 }
+            }
+        }
+
+        class CGTValue extends HTMLElement {
+            static observedAttributes = ["for"]
+
+            #eventListener = (ev) => this.#updateFromGameState(ev.detail.state)
+            #target = new TargetElement((oldElem, newElem) => {
+                oldElem?.removeEventListener("game-update", this.#eventListener)
+                newElem.addEventListener("game-update", this.#eventListener);
+                if (newElem instanceof KonaneHTMLElement) {
+                    this.#updateFromGameState(newElem.game);
+                } else {
+                    console.warn("invalid target for cgt-value element ", newElem)
+                }
+            })
+
+            constructor() {
+                super();
             }
 
             #updateFromGameState(state) {
@@ -2340,15 +2290,83 @@
 
             attributeChangedCallback(attr, oldVal, newVal) {
                 if (attr === "for") {
-                    this.#watchedElem?.removeEventListener("game-update", this.#eventListener)
-                    this.#watchedSelector = newVal;
-                    this.#tryUpdateWatchedElem();
+                    this.#target.target(newVal);
+                }
+            }
+        }
+
+        class CGTGameControl extends HTMLButtonElement {
+            static observedAttributes = ["for", "type"]
+            #target = new TargetElement((oldElem, newElem) => { })
+
+            /** @type {"undo" | "redo" | "reset" | "none"} */
+            #function = null;
+            #icons = {
+                "undo": "⟵",
+                "redo": "⟶",
+                "reset": "⟳",
+                "none": "?"
+            }
+            #button
+
+            constructor() {
+                super()
+                this.addEventListener("click", (_ev) => this.#handleClick());
+
+            }
+
+            #handleClick() {
+                if (this.#target.element === null) {
+                    console.warn("click before target element was found");
+                    return;
+                }
+
+                if (!(this.#target.element instanceof KonaneHTMLElement)) {
+                    console.warn("target element is not a konane game");
+                    return;
+                }
+                switch (this.#function) {
+                    case "none": {   
+                        break;
+                    }
+                    case "redo": {
+                        this.#target.element?.redo();
+                        break;
+                    }
+                    case "undo": {
+                        this.#target.element?.undo();
+                        break;
+                    }
+                    case "reset": {
+                        this.#target.element?.reset();
+                        break;
+                    }
+                }
+            }
+
+            #updateFunction(func) {
+                if (!["undo", "redo", "reset", "none"].includes(func)) {
+                    console.warn("invalid function: ", func);
+                    return;
+                }
+
+                this.#function = func;
+                this.innerHTML = `<span>${this.#icons[func]}</span>`;
+            }
+
+            attributeChangedCallback(attr, oldVal, newVal) {
+                if (attr === "for") {
+                    this.#target.target(newVal);
+                }
+                if (attr === "type") {
+                    this.#updateFunction(newVal)
                 }
             }
         }
 
         customElements.define("cgt-konane", KonaneHTMLElement);
         customElements.define("cgt-value", CGTValue);
+        customElements.define("cgt-control", CGTGameControl, { extends: "button" });
     </script>
 
     <style class="global">
@@ -2357,6 +2375,7 @@
             --fg: #111;
             --bg: #fff;
         }
+
         @media (prefers-color-scheme: dark) {
             :root {
                 --fg: #fff;
@@ -2411,7 +2430,7 @@
             padding: 1em;
         }
 
-        .side-by-side > * {
+        .side-by-side>* {
             max-width: 400px;
         }
 
@@ -2428,26 +2447,48 @@
             padding: .5rem;
             font-size: 1.5rem;
         }
+
         cgt-konane.inline-left {
             float: left;
             padding-right: 1.5rem;
         }
+
         cgt-konane.inline-right {
             float: right;
             padding-left: 2rem
         }
+
         cgt-konane {
             padding: 10pt;
             display: block;
         }
+
         .fig-size1 {
             width: 8rem;
         }
+
         .fig-size2 {
             width: 12rem;
         }
+
         .fig-size3 {
             width: 16rem;
+        }
+
+
+        button {
+            padding: .2rem .4rem;
+            font-size: 1.2rem;
+            font-weight: normal;
+            background: var(--bg);
+            color: var(--fg);
+            border: .1rem solid var(--fg);
+            border-radius: 0;
+            cursor: pointer;
+            vertical-align: middle;
+            text-align: center;
+            margin: auto;
+            display: inline-block;
         }
     </style>
 
@@ -2470,13 +2511,20 @@
 
                 </div>
                 <div>
-                    <cgt-value for="#intro-game"></cgt-value>
-                    <cgt-konane id="intro-game" controls="right">
-                        ____
-                        _xo_
-                        __xo_
-                        _____
-                    </cgt-konane>
+                    <div style="display: flex; flex-flow: column; justify-content: center;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 6fr; grid-template-rows: 1fr; align-items: center; column-gap: 8pt; padding-right: 2em; padding-left: 2em;">
+                            <button is="cgt-control" for="#intro-game" type="undo" style="width: 100%"></button>
+                            <button is="cgt-control" for="#intro-game" type="reset" style="width: 100%"></button>
+                            <button is="cgt-control" for="#intro-game" type="redo" style="width: 100%"></button>
+                            <cgt-value for="#intro-game" style="text-align: right;"></cgt-value>
+                        </div>
+                        <cgt-konane id="intro-game" controls="right">
+                            ____
+                            _xo_
+                            __xo_
+                            _____
+                        </cgt-konane>
+                    </div>
                 </div>
                 <script>
                     document.getElementById("intro-game").addEventListener("game-complete", ev => {
@@ -2503,15 +2551,22 @@
             <p>Any number of jumps can be made in a single direction.
                 For example, in this game you (black), can capture 1, 2, 3, or 4 white pieces.
             </p>
-            <div>
-                <cgt-konane style="padding: 4pt" id="game-long-jump" controls="bottom">
+            <div style="display: flex; flex-flow: row; column-gap: 12pt;">
+                <cgt-konane style="padding: 4pt; flex-grow: 1" id="game-long-jump" controls="bottom">
                     xo_o_o_o_
                 </cgt-konane>
+                <button is="cgt-control" for="#game-long-jump" style="line-height: 2rem;" type="reset"></button>
             </div>
 
             <p>Finally, here's a full board - have fun!</p>
-            <div style="display: block; padding: 8pt 6em 8pt 6em;">
-                <cgt-konane id="full-5x5">
+            <div style="display: flex; flex-flow: column; justify-content: center;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 6fr; grid-template-rows: 1fr; align-items: center; column-gap: 8pt; padding-right: 2em; padding-left: 2em;">
+                    <button is="cgt-control" for="#full-5x5" type="undo" style="width: 100%"></button>
+                    <button is="cgt-control" for="#full-5x5" type="reset" style="width: 100%"></button>
+                    <button is="cgt-control" for="#full-5x5" type="redo" style="width: 100%"></button>
+                    <cgt-value for="#full-5x5" style="text-align: right;"></cgt-value>
+                </div>
+                <cgt-konane id="full-5x5" style="flex-grow: 1" >
                     xoxo
                     oxoxo
                     x__ox
@@ -2542,7 +2597,7 @@
                 _xoxoxo_
             </cgt-konane>
 
-            
+
             <p>
                 This is a simple linear pattern.
                 By analyzing the game we can determine who wins just by the number of white and black pieces.
@@ -2595,10 +2650,11 @@
             <p>
                 Notice that the games with an odd number of pieces are all valued at some number less than zero.
                 That's a consequence of black having no moves.
-                No matter what move white makes, black can't ever move in these games. 
-                Try it! we'll your playing white in games above, and we'll skip black's turn if they don't have any moves.
+                No matter what move white makes, black can't ever move in these games.
+                Try it! we'll your playing white in games above, and we'll skip black's turn if they don't have any
+                moves.
             </p>
-        
+
         </section>
     </main>
 </body>
