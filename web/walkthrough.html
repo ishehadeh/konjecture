@@ -328,7 +328,10 @@
              * @param {CanonicalForm} rhs
              * @returns {PartialOrdering}
              */
-            partialCompare(rhs, checkEquality = true) {
+            partialCompare(rhs) {
+                if (!(rhs instanceof CanonicalForm)) {
+                    throw new TypeError("expected an instance of CanonicalForm")
+                }
                 // TEMPERATURE THEORY AND THE THERMOSTATIC STRATEGY, Karen Ye
                 // https://www.math.uchicago.edu/~may/VIGRE/VIGRE2009/REUPapers/Ye.pdf
                 // Definition 2.3: An equivalent definition of inequality is that G ≥ H if and only
@@ -849,6 +852,13 @@
             }
         }
 
+        test("NumberUpStar comparison 0 || *", (t) => {
+            let zero = new NumberUpStar(0, 0, 0);
+            let star = new NumberUpStar(0, 0, 1);
+
+            t.assertEq(zero.partialCompare(star), NaN);
+        })
+
         test("NumberUpStar compares up & up move set with star", (t) => {
             let up = new NumberUpStar(0, 1, 0);
             let down = new NumberUpStar(0, -1, 0);
@@ -983,7 +993,7 @@
                     let insert = true;
                     for (const i in moves) {
                         const cmp = m.partialCompare(moves[i]);
-                        if (cmp != null) {
+                        if (!Number.isNaN(cmp)) {
                             // since we have some ordering with an existing move
                             // there's no need to add this one.
                             insert = false;
@@ -1296,6 +1306,14 @@
             t.assertEq(star, new NumberUpStar(0, 0, 1));
             t.assert(star instanceof NumberUpStar);
         })
+        test("canonicalForm {0,*|0,*} == *2", (t) => {
+            const moveSet = new MoveSet([new NumberUpStar(0), new NumberUpStar(0, 0, 1)], [new NumberUpStar(0), new NumberUpStar(0, 0, 1)])
+
+            t.assertEq(moveSet.partialCompare(new NumberUpStar(0)), NaN);
+            t.assertEq(moveSet.partialCompare(new NumberUpStar(0, 0, 1)), NaN);
+            t.assertEq(moveSet.normalize(), new NumberUpStar(0, 0, 2));
+        })
+
     </script>
 
     <script type="text/javascript" id="Konane Mechanics">
@@ -1814,17 +1832,20 @@
 
     <template id="template-konane">
         <style>
+            /* to be aria-friendly we're splitting it into rows */
             #board {
                 display: grid;
-                grid-template-columns: repeat(var(--konane-width), 1fr);
                 grid-template-rows: repeat(var(--konane-height), 1fr);
                 background-color: var(--bg);
                 aspect-ratio: var(--konane-width) / var(--konane-height);
                 min-height: 0;
                 min-width: 0;
                 flex: 1 1 auto;
+            }
 
-
+            .row {
+                display: grid;
+                grid-template-columns: repeat(var(--konane-width), 1fr);
             }
 
             .cell {
@@ -1834,9 +1855,19 @@
                 padding: max(.3rem, 10%);
             }
 
-            .highlight {
-                background-color: yellow;
-                opacity: 50%;
+            .highlight > div {
+                --line-width: 3pt;
+                --left-stop-0: calc(50% - var(--line-width) / 2);
+                --left-stop-1: calc(0.01% + var(--left-stop-0));
+                --right-stop-1: calc(50% + var(--line-width) / 2);
+                --right-stop-0: calc(0.01% + var(--right-stop-1));
+                
+                background: 
+                    linear-gradient(45deg, transparent var(--left-stop-0), var(--fg) var(--left-stop-1), var(--fg) var(--right-stop-1), transparent var(--right-stop-0)),
+                    linear-gradient(-45deg, transparent var(--left-stop-0), var(--fg) var(--left-stop-1), var(--fg) var(--right-stop-1), transparent var(--right-stop-0));
+                /* opacity: 50%; */
+                aspect-ratio: 1;
+                margin: 25%;
             }
 
             .black {
@@ -1844,6 +1875,14 @@
                 background-color: black;
                 border: 1px solid var(--fg);
                 aspect-ratio: 1;
+            }
+
+            .black:focus {
+                background: radial-gradient(white 0%, white 15%, transparent calc(15% + min(3%, 1pt)));
+            }
+
+            .white:focus {
+                background: radial-gradient(black 0%, black 15%, transparent calc(15% + min(3%, 1pt)));
             }
 
             .white {
@@ -1881,7 +1920,7 @@
                 }
             }
         </style>
-        <div id="board"></div>
+        <div id="board" tabindex="1" role="grid"></div>
     </template>
 
     <script>
@@ -1895,12 +1934,63 @@
                 this.refreshBoardState();
             });
             #runtimeStyles = new CSSStyleSheet();
-            #interactiveColor = "black";
+            
+            /** 2D grid of HTMLElement tiles encoded as an 1D array.
+             * Prefer {@link KonaneHTMLElement._getTileNode()} to using this property directly.
+             * @type {HTMLElement[]}
+             */
+            #tileMap = []
+
+            /** The color that can be controlled by interacting with the site
+             * @type {["black"] | ["white"] | ["black", "white"] | []}
+             */
+            #interactiveColor = ["black"];
             #proposedMoves = [];
             #history = [];
             #historyIdx = -1;
-            #activeCell = null;
 
+            /** The active cell has a minor animation and highlights cells where the occupying stone move.
+             * @type {[bigint, bigint] | null}
+             */
+            #activeCellPosition = null;
+            
+            /** The active cell has a minor animation and highlights cells where the occupying stone move.
+             *  This property gets that cell's <x, y> position (top left of the board is <0, 0>), or null if no cell is active
+             * @type {[bigint, bigint] | null}
+             */ 
+             get activeCellPosition() { return this.#activeCellPosition } 
+            
+            /** The active cell has a minor animation and highlights cells where the occupying stone move.
+             *  This property gets that cell's HTMLElement, or null if no cell is active.
+             * @type {HTMLElement | null}
+             */
+            get activeCell() { 
+                const pos = this.activeCellPosition;
+                if (pos === null) return null;
+                return this._getTileNode(pos[0], pos[1]);
+            }
+
+            /** The focused cell is the one that has been selected using tab focus
+             * @type {[bigint, bigint] | null}
+             */ 
+            #focusedCellPosition = null;
+
+            /** The focused cell is the one that has been selected using tab focus.
+             *  This property gets that cell's <x, y> position (top left of the board is <0, 0>), or null if no cell is focused
+             * @type {[bigint, bigint] | null}
+             */ 
+            get focusedCellPosition() { return this.#focusedCellPosition } 
+            
+            /** The focused cell is the one that has been selected using tab focus.
+             *  This property gets that cell's HTMLElement, or null if no cell is focused
+             * @type {HTMLElement | null}
+             */
+            get focusedCell() { 
+                const pos = this.focusedCellPosition;
+                if (pos === null) return null;
+                return this._getTileNode(pos[0], pos[1]);
+            }
+            
             static fromGame(game) {
                 let elem = new KonaneHTMLElement();
                 elem.innerHTML = game.toString();
@@ -1924,25 +2014,31 @@
             attributeChangedCallback(name, oldValue, newValue) {
                 switch (name) {
                     case "player":
-                        this.#interactiveColor = newValue ?? "black";
+                        if (!["black", "white", "both", "neither"].includes(newValue)) {
+                            console.warn("invalid value for 'player' attribute", newValue);
+                        } else {
+                            if (newValue == "both") {
+                                this.#interactiveColor = ["black", "white"];
+                            } else if (newValue == "neither") {
+                                this.#interactiveColor = [];
+                            } else {
+                                this.#interactiveColor = [newValue];
+                            }
+                            this.syncAriaRoles();
+                        }
                         break;
-                    case "turn":
+                    case "turn": {
+                        if (!["black", "white"].includes(newValue)) {
+                            console.warn("invalid value for 'turn' attribute", newValue);
+                            break;
+                        }
                         this.#history = [[this.game.clone(), newValue]];
                         this.#proposedMoves = [];
                         this.#historyIdx = 0;
                         this.createAllTiles();
-                        this.updateValue();
                         this.dispatchEvent(new CustomEvent("game-init", { detail: { state: this.game.clone() } }));
+                        this.updateValue();
                         break;
-                    case "controls": {
-                        const values = ["left", "right", "top", "bottom", "none"];
-                        const classNames = values.map(ctrl => `ctrl-${ctrl}`);
-                        if (!["left", "right", "top", "bottom", "none"].includes(newValue)) {
-                            console.warn("invalid value for controls attribute")
-                        } else {
-                            this.shadowRoot.getElementById("game")?.classList.remove(...classNames);
-                            this.shadowRoot.getElementById("game")?.classList.add(`ctrl-${newValue}`);
-                        }
                     }
                 }
             }
@@ -1955,8 +2051,27 @@
                 this.#history = [[Konane.fromString(boardStr), currentPlayer]];
 
                 this.createAllTiles();
-                this.updateValue();
+                this.syncAriaRoles();
                 this.dispatchEvent(new CustomEvent("game-init", { detail: { state: this.game.clone() } }));
+                this.updateValue();
+            }
+
+            #updateCellAriaRole(el) {
+                for (const color of this.#interactiveColor) {
+                    if (el.classList.contains(color)) {
+                        el.setAttribute("role", "button");
+                        el.setAttribute("tabindex", "0");
+                        return
+                    }
+                }
+                el.removeAttribute("role");
+                el.removeAttribute("tabindex");
+            }
+
+            syncAriaRoles() {
+                this.shadowRoot.querySelectorAll(".cell > div").forEach((el) => {
+                    this.#updateCellAriaRole(el);
+                })
             }
 
             /** Add a move to the list of highlighted moves.
@@ -1971,7 +2086,9 @@
                 }
 
                 this.#proposedMoves.push(move);
-                this._getTileNode(move.toX, move.toY)?.parentElement?.classList?.add("highlight");
+                const tile = this._getTileNode(move.toX, move.toY);
+                tile?.parentElement?.classList?.add("highlight");
+                tile?.setAttribute("tabindex", "0");
             }
 
             /**
@@ -2004,17 +2121,14 @@
             }
 
             activateCell(x, y) {
-                if (this.#activeCell != null) {
-                    this._getTileNode(this.#activeCell[0], this.#activeCell[1])?.classList.remove("active");
-                }
-                this.#activeCell = [x, y];
-                this._getTileNode(x, y)?.classList.add("active");
+                this.deactivateCell();
+                this.#activeCellPosition = [x, y];
+                this.activeCell?.classList?.add("active");
             }
 
             deactivateCell() {
-                if (this.#activeCell != null) {
-                    this._getTileNode(this.#activeCell[0], this.#activeCell[1])?.classList.remove("active");
-                }
+                this.activeCell?.classList?.remove("active");
+                this.#activeCellPosition = null;
             }
 
             proposeMovesForCell(x, y) {
@@ -2044,7 +2158,7 @@
                     this.dispatchEvent(new CustomEvent("game-complete", { detail: { winner: this.currentPlayer == "black" ? "white" : "black" } }));
                 }
 
-                if (this.currentPlayer != this.#interactiveColor) {
+                if (!this.#interactiveColor.includes(this.currentPlayer)) {
                     this.computerTurn();
                 }
 
@@ -2132,6 +2246,25 @@
                 }, 350)
             }
 
+            #makeCellLabel(x, y, state) {
+                const STATE_PRETY_SUFFIX = {
+                    "empty": " Empty",
+                    "black": " Black",
+                    "white": " White",
+                };
+                const ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+                const ALPHA_LEN = BigInt(ALPHA.length);
+                let label = "";
+                let xRemainder = BigInt(x) + 1n;
+                while (xRemainder > 0) {
+                    label += ALPHA.charAt(Number(xRemainder % ALPHA_LEN));
+                    xRemainder /= BigInt(ALPHA_LEN);
+                }
+                label += (BigInt(y) + 1n).toString();
+                label += STATE_PRETY_SUFFIX[state];
+                return label; 
+            }
+
             _makeTileNode(x, y, state) {
                 x = requireInteger(x, "x coordinate");
                 y = requireInteger(y, "y coordinate");
@@ -2140,18 +2273,20 @@
                 }
                 const wrapperEl = document.createElement("div");
                 wrapperEl.setAttribute("class", "cell");
+                wrapperEl.ariaLabel = this.#makeCellLabel(x, y, state);
+                wrapperEl.role = "gridcell";
 
                 const stoneEl = document.createElement("div");
                 stoneEl.setAttribute("id", `tile-x${x}y${y}`);
                 stoneEl.setAttribute("class", state);
+                stoneEl.role = "img";
 
-                wrapperEl.appendChild(stoneEl);
-                wrapperEl.addEventListener("click", (_) => {
-                    if (this.currentPlayer == this.#interactiveColor) {
-                        if (this.#interactiveColor == this.game.getTile(x, y)) {
-                            if (this.#activeCell != null) {
+                const handleInteraction = (ev) => {
+                    if (this.#interactiveColor.includes(this.currentPlayer)) {
+                        if (this.#interactiveColor.includes(this.game.getTile(x, y))) {
+                            if (this.#activeCellPosition != null) {
                                 this.clearProposedMoves();
-                                if (this.#activeCell[0] === x && this.#activeCell[1] === y) {
+                                if (this.#activeCellPosition[0] === x && this.#activeCellPosition[1] === y) {
                                     this.deactivateCell();
                                     return;
                                 }
@@ -2165,7 +2300,67 @@
                             this.clearProposedMoves();
                         }
                     }
-                })
+                }
+
+                wrapperEl.appendChild(stoneEl);
+                wrapperEl.addEventListener("click", handleInteraction);
+                stoneEl.addEventListener("keydown", (ev) => {
+                    if (this.#focusedCellPosition !== null && this.#focusedCellPosition[0] === x && this.#focusedCellPosition[1] === y) {
+                        if (ev.code == "Space" || ev.key == "Enter") {
+                            ev.preventDefault();
+                            handleInteraction(ev)
+                        }
+
+                        if (ev.code === "ArrowLeft") {
+                            ev.preventDefault();
+                            for (let x1 = x - 1n; x1 >= 0n; --x1) {
+                                const tile = this._getTileNode(x1, y);
+                                if (tile.tabIndex >= 0) {
+                                    tile.focus();
+                                    break;
+                                }
+                            }
+                        }
+                        if (ev.code === "ArrowRight") {
+                            ev.preventDefault();
+                            for (let x1 = x + 1n; x1 < this.game.width; ++x1) {
+                                const tile = this._getTileNode(x1, y);
+                                if (tile.tabIndex >= 0) {
+                                    tile.focus();
+                                    break;
+                                }
+                            }
+                        }
+                        if (ev.code === "ArrowUp") {
+                            ev.preventDefault();
+                            for (let y1 = y - 1n; y1 >= 0n; --y1) {
+                                const tile = this._getTileNode(x, y1);
+                                if (tile.tabIndex >= 0) {
+                                    tile.focus();
+                                    break;
+                                }
+                            }
+                        }
+                        if (ev.code === "ArrowDown") {
+                            ev.preventDefault();
+                            for (let y1 = y + 1n; y1 <= this.game.height; --y1) {
+                                const tile = this._getTileNode(x, y1);
+                                if (tile.tabIndex >= 0) {
+                                    tile.focus();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                });
+                stoneEl.addEventListener("focusin", (ev) => {
+                    this.#focusedCellPosition = [x, y];
+                });
+                stoneEl.addEventListener("focusout", (ev) => {
+                    if (this.#focusedCellPosition !== null && this.#focusedCellPosition[0] === x && this.#focusedCellPosition[1] === y) {
+                        this.#focusedCellPosition = null;
+                    }
+                });
 
                 return wrapperEl;
             }
@@ -2177,16 +2372,23 @@
                     throw Error(`tried to set node at <${x}, ${y}> to an invalid state: '${state}'`);
                 }
                 const node = this._mustGetTileNode(x, y);
-
-                this._mustGetTileNode(x, y).setAttribute("class", state)
+                this.#updateCellAriaRole(node);
+                node.classList.remove("black", "white", "empty");
+                node.classList.add(state);
+                node.classList.add(`col-${x}`);
+                node.classList.add(`row-${y}`);
+                node.ariaLabel = this.#makeCellLabel(x, y, state);
             }
 
-
             _getTileNode(x, y) {
+                return this.cellAt(x, y)?.firstElementChild
+            }
+
+            cellAt(x, y) {
                 x = requireInteger(x, "x coordinate");
                 y = requireInteger(y, "y coordinate");
 
-                return this.shadowRoot.getElementById(`tile-x${x}y${y}`);
+                return this.#tileMap[y * this.game.width + x];
             }
 
             _mustGetTileNode(x, y) {
@@ -2203,13 +2405,22 @@
                 --konane-width: ${this.game.width};
                 --konane-height: ${this.game.height};
             }`)
-                const nodes = []
+                const nodes = [];
+                const rows = [];
                 for (let y = 0; y < this.game.height; ++y) {
+                    const rowContainer = document.createElement("div");
+                    rowContainer.classList.add("row");
+                    rowContainer.role = "row";
+
                     for (let x = 0; x < this.game.width; ++x) {
-                        nodes.push(this._makeTileNode(x, y, this.game.getTile(x, y)))
+                        let node = this._makeTileNode(x, y, this.game.getTile(x, y));
+                        rowContainer.appendChild(node);
+                        nodes.push(node);
                     }
+                    rows.push(rowContainer);
                 }
-                this.shadowRoot.getElementById("board").replaceChildren(...nodes)
+                this.shadowRoot.getElementById("board").replaceChildren(...rows)
+                this.#tileMap = nodes;
             }
 
 
@@ -2542,7 +2753,7 @@
                     <button class="undo" onclick="undo('#intro-final-game')"></button>
                     <button class="reset" onclick="reset('#intro-final-game')"></button>
                     <button class="redo" onclick="redo('#intro-final-game')"></button>
-                    <cgt-value for="#intro-game"></cgt-value>
+                    <cgt-value for="#intro-final-game"></cgt-value>
                 </div>
                 <cgt-konane id="intro-final-game" style="flex-grow: 1">
                     xoxo
@@ -2628,15 +2839,27 @@
 
             <p>
                 Notice that the games with an odd number of pieces are all valued at some number less than zero.
-                That's a consequence of black having no moves.
-                No matter what move white makes, black can't ever move in these games.
+                Numbers less than zero indicate a certain win for white.
                 Try it! we'll your playing white in games above, and we'll skip black's turn if they don't have any
                 moves.
             </p>
 
+            <p>
+                Clearly, when there's an odd number of moves
+            </p>
         </section>
+
+
     </main>
 </body>
 
+<!--
+
+THE A11Y CHECKLIST
+
+- [ ] Does the page work zoomed from 50% to 200%?
+- [ ] Interactive elements included in tab browsing
+
+-->
 
 </html>
