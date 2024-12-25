@@ -1855,6 +1855,13 @@
                 padding: max(.3rem, 10%);
             }
 
+            .cell:focus {
+                /* border: 3px solid red; */
+                /* border-image: linear-gradient(to right, var(--fg) 0%, #3a4ed5 100%) 1; */
+                outline: none;
+                border: 0.2rem solid var(--fg);
+            }
+
             .highlight > div {
                 --line-width: 3pt;
                 --left-stop-0: calc(50% - var(--line-width) / 2);
@@ -1877,13 +1884,6 @@
                 aspect-ratio: 1;
             }
 
-            .black:focus {
-                background: radial-gradient(white 0%, white 15%, transparent calc(15% + min(3%, 1pt)));
-            }
-
-            .white:focus {
-                background: radial-gradient(black 0%, black 15%, transparent calc(15% + min(3%, 1pt)));
-            }
 
             .white {
                 border-radius: 50%;
@@ -2060,12 +2060,10 @@
                 for (const color of this.#interactiveColor) {
                     if (el.classList.contains(color)) {
                         el.setAttribute("role", "button");
-                        el.setAttribute("tabindex", "0");
                         return
                     }
                 }
                 el.removeAttribute("role");
-                el.removeAttribute("tabindex");
             }
 
             syncAriaRoles() {
@@ -2275,6 +2273,7 @@
                 wrapperEl.setAttribute("class", "cell");
                 wrapperEl.ariaLabel = this.#makeCellLabel(x, y, state);
                 wrapperEl.role = "gridcell";
+                wrapperEl.setAttribute("tabindex", "0");
 
                 const stoneEl = document.createElement("div");
                 stoneEl.setAttribute("id", `tile-x${x}y${y}`);
@@ -2304,7 +2303,7 @@
 
                 wrapperEl.appendChild(stoneEl);
                 wrapperEl.addEventListener("click", handleInteraction);
-                stoneEl.addEventListener("keydown", (ev) => {
+                wrapperEl.addEventListener("keydown", (ev) => {
                     if (this.#focusedCellPosition !== null && this.#focusedCellPosition[0] === x && this.#focusedCellPosition[1] === y) {
                         if (ev.code == "Space" || ev.key == "Enter") {
                             ev.preventDefault();
@@ -2314,7 +2313,7 @@
                         if (ev.code === "ArrowLeft") {
                             ev.preventDefault();
                             for (let x1 = x - 1n; x1 >= 0n; --x1) {
-                                const tile = this._getTileNode(x1, y);
+                                const tile = this.cellAt(x1, y);
                                 if (tile.tabIndex >= 0) {
                                     tile.focus();
                                     break;
@@ -2324,7 +2323,7 @@
                         if (ev.code === "ArrowRight") {
                             ev.preventDefault();
                             for (let x1 = x + 1n; x1 < this.game.width; ++x1) {
-                                const tile = this._getTileNode(x1, y);
+                                const tile = this.cellAt(x1, y);
                                 if (tile.tabIndex >= 0) {
                                     tile.focus();
                                     break;
@@ -2334,7 +2333,7 @@
                         if (ev.code === "ArrowUp") {
                             ev.preventDefault();
                             for (let y1 = y - 1n; y1 >= 0n; --y1) {
-                                const tile = this._getTileNode(x, y1);
+                                const tile = this.cellAt(x, y1);
                                 if (tile.tabIndex >= 0) {
                                     tile.focus();
                                     break;
@@ -2343,8 +2342,8 @@
                         }
                         if (ev.code === "ArrowDown") {
                             ev.preventDefault();
-                            for (let y1 = y + 1n; y1 <= this.game.height; --y1) {
-                                const tile = this._getTileNode(x, y1);
+                            for (let y1 = y + 1n; y1 < this.game.height; ++y1) {
+                                const tile = this.cellAt(x, y1);
                                 if (tile.tabIndex >= 0) {
                                     tile.focus();
                                     break;
@@ -2353,10 +2352,10 @@
                         }
                     }
                 });
-                stoneEl.addEventListener("focusin", (ev) => {
+                wrapperEl.addEventListener("focusin", (ev) => {
                     this.#focusedCellPosition = [x, y];
                 });
-                stoneEl.addEventListener("focusout", (ev) => {
+                wrapperEl.addEventListener("focusout", (ev) => {
                     if (this.#focusedCellPosition !== null && this.#focusedCellPosition[0] === x && this.#focusedCellPosition[1] === y) {
                         this.#focusedCellPosition = null;
                     }
