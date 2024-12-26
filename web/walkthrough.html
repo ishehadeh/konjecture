@@ -2576,16 +2576,29 @@
 
         main {
             counter-reset: figure 0;
+            counter-reset: example 0;
         }
 
-        figure {
+        figure:not(.example) {
             counter-increment: figure;
             overflow: visible;
             margin: 10pt auto 10pt auto;
         }
 
-        figcaption::before {
+        figure.example {
+            counter-increment: example;
+            overflow: visible;
+            margin: 10pt auto 10pt auto;
+        }
+
+        figure:not(.example) figcaption::before {
             content: "Fig. " counter(figure);
+            margin-right: 1rem;
+            font-style: italic;
+        }
+
+        figure.example figcaption::before {
+            content: "Example " counter(example);
             margin-right: 1rem;
             font-style: italic;
         }
@@ -2650,18 +2663,6 @@
         cgt-konane {
             padding: 10pt;
             display: block;
-        }
-
-        .fig-size1 {
-            width: 8rem;
-        }
-
-        .fig-size2 {
-            width: 12rem;
-        }
-
-        .fig-size3 {
-            width: 16rem;
         }
 
 
@@ -2733,9 +2734,8 @@
                         HINT: Try clicking or tapping on one of the black circles.
                     </div>
                     <br>
-                    <div>
-                        <span style="font-weight: bolder;" id="intro-game-winner"></span>
-                    </div>
+                    <div style="font-weight: bold;max-width: 200px;" id="intro-game-winner"></div>
+
 
                 </div>
                 <div class="flex-column-center">
@@ -2756,9 +2756,9 @@
                 <script>
                     document.getElementById("intro-game").addEventListener("game-complete", ev => {
                         if (ev.detail.winner == "black") {
-                            document.getElementById("intro-game-winner").innerText = "you won!"
+                            document.getElementById("intro-game-winner").innerText = "Black won!"
                         } else {
-                            document.getElementById("intro-game-winner").innerText = "you lost 😔\ntry clicking the reset button."
+                            document.getElementById("intro-game-winner").innerText = "White won 😔\ntry clicking the reset button."
                         }
                     });
                     document.getElementById("intro-game").addEventListener("game-init", ev => {
@@ -2962,6 +2962,50 @@
                 <li>What's the value of the first solid linear pattern with an odd length?</li>
             </ol>
             </p>
+
+            <h2>Numbers</h2>
+            <p>We've been talking around the actual values for a while now.
+                How exactly do we rate the "goodness" of a particular configuration for one player?
+                <br>
+                Think of numbers a ratio of how many <i>potential</i> turns each player has in the game.
+                The sign indicates who will win.
+                For example: <i>-3</i> indicates that white can make three moves from this position, and black can make
+                none.
+
+            </p>
+            <figure class="example">
+                <figcaption>Meaning of -2</figcaption>
+                <div>
+                    <p>
+                        <i>-2</i> indicates that after <i>all</i> black's moves have been exhausted, white will still
+                        have 3.
+                        <br>
+                        This game has the value <cgt-value style="font-style:bold; font-size: inherit"
+                            for="#example-neg-3"></cgt-value>
+                    </p>
+                    <cgt-konane id="example-neg-3">
+                        ox__ox
+                        ox__ox
+                        ox__xo
+                    </cgt-konane>
+                </div>
+            </figure>
+            <figure class="example">
+                <figcaption>Meaning of -1/2</figcaption>
+                <div>
+                    <p>
+                        <i>-1/2</i> indicates that black has more moves from this particular position than white, but
+                        those moves are self destructive.
+                        <br>
+                        This game has the value <cgt-value style="font-style:bold; font-size: inherit"
+                            for="#example-neg-3div2"></cgt-value>
+                    </p>
+                    <cgt-konane id="example-neg-3div2">
+                        _xo_o
+                        __x_
+                    </cgt-konane>
+                </div>
+            </figure>
         </section>
     </main>
 </body>
