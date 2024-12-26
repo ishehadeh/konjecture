@@ -2,8 +2,8 @@
 <html lang="en-US">
 
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
 
     <title>Konane</title>
 
@@ -1838,9 +1838,6 @@
                 grid-template-rows: repeat(var(--konane-height), 1fr);
                 background-color: var(--bg);
                 aspect-ratio: var(--konane-width) / var(--konane-height);
-                min-height: 0;
-                min-width: 0;
-                flex: 1 1 auto;
             }
 
             .row {
@@ -1858,18 +1855,18 @@
             .cell:focus {
                 /* border: 3px solid red; */
                 /* border-image: linear-gradient(to right, var(--fg) 0%, #3a4ed5 100%) 1; */
+                background: color-mix(in srgb, var(--fg) 20%, var(--bg));
                 outline: none;
-                border: 0.2rem solid var(--fg);
             }
 
-            .highlight > div {
+            .highlight>div {
                 --line-width: 3pt;
                 --left-stop-0: calc(50% - var(--line-width) / 2);
                 --left-stop-1: calc(0.01% + var(--left-stop-0));
                 --right-stop-1: calc(50% + var(--line-width) / 2);
                 --right-stop-0: calc(0.01% + var(--right-stop-1));
-                
-                background: 
+
+                background:
                     linear-gradient(45deg, transparent var(--left-stop-0), var(--fg) var(--left-stop-1), var(--fg) var(--right-stop-1), transparent var(--right-stop-0)),
                     linear-gradient(-45deg, transparent var(--left-stop-0), var(--fg) var(--left-stop-1), var(--fg) var(--right-stop-1), transparent var(--right-stop-0));
                 /* opacity: 50%; */
@@ -1934,7 +1931,7 @@
                 this.refreshBoardState();
             });
             #runtimeStyles = new CSSStyleSheet();
-            
+
             /** 2D grid of HTMLElement tiles encoded as an 1D array.
              * Prefer {@link KonaneHTMLElement._getTileNode()} to using this property directly.
              * @type {HTMLElement[]}
@@ -1953,18 +1950,18 @@
              * @type {[bigint, bigint] | null}
              */
             #activeCellPosition = null;
-            
+
             /** The active cell has a minor animation and highlights cells where the occupying stone move.
              *  This property gets that cell's <x, y> position (top left of the board is <0, 0>), or null if no cell is active
              * @type {[bigint, bigint] | null}
-             */ 
-             get activeCellPosition() { return this.#activeCellPosition } 
-            
+             */
+            get activeCellPosition() { return this.#activeCellPosition }
+
             /** The active cell has a minor animation and highlights cells where the occupying stone move.
              *  This property gets that cell's HTMLElement, or null if no cell is active.
              * @type {HTMLElement | null}
              */
-            get activeCell() { 
+            get activeCell() {
                 const pos = this.activeCellPosition;
                 if (pos === null) return null;
                 return this._getTileNode(pos[0], pos[1]);
@@ -1972,25 +1969,25 @@
 
             /** The focused cell is the one that has been selected using tab focus
              * @type {[bigint, bigint] | null}
-             */ 
+             */
             #focusedCellPosition = null;
 
             /** The focused cell is the one that has been selected using tab focus.
              *  This property gets that cell's <x, y> position (top left of the board is <0, 0>), or null if no cell is focused
              * @type {[bigint, bigint] | null}
-             */ 
-            get focusedCellPosition() { return this.#focusedCellPosition } 
-            
+             */
+            get focusedCellPosition() { return this.#focusedCellPosition }
+
             /** The focused cell is the one that has been selected using tab focus.
              *  This property gets that cell's HTMLElement, or null if no cell is focused
              * @type {HTMLElement | null}
              */
-            get focusedCell() { 
+            get focusedCell() {
                 const pos = this.focusedCellPosition;
                 if (pos === null) return null;
                 return this._getTileNode(pos[0], pos[1]);
             }
-            
+
             static fromGame(game) {
                 let elem = new KonaneHTMLElement();
                 elem.innerHTML = game.toString();
@@ -2067,7 +2064,7 @@
             }
 
             syncAriaRoles() {
-                this.shadowRoot.querySelectorAll(".cell > div").forEach((el) => {
+                this.shadowRoot.querySelectorAll(".cell").forEach((el) => {
                     this.#updateCellAriaRole(el);
                 })
             }
@@ -2141,6 +2138,7 @@
              * @param {KonaneMove} move
              */
             applyMove(move) {
+                this.dispatchEvent(new CustomEvent("konane-move-begin", { detail: { player: this.currentPlayer, state: this.game, move, } }));
                 if (!(move instanceof KonaneMove)) {
                     throw new TypeError(`expected an instance of KonaneMove, found ${move}`);
                 }
@@ -2149,6 +2147,7 @@
                 for (const { x, y } of move.clearedCells()) {
                     this.setTileState(x, y, "empty");
                 }
+                this.dispatchEvent(new CustomEvent("konane-move-applied", { detail: { player: this.currentPlayer, state: this.game, move, } }));
                 this.updateValue();
 
                 const currentPlayerHasMoves = !this.game.moves(this.currentPlayer).allMoves().next().done;
@@ -2260,7 +2259,7 @@
                 }
                 label += (BigInt(y) + 1n).toString();
                 label += STATE_PRETY_SUFFIX[state];
-                return label; 
+                return label;
             }
 
             _makeTileNode(x, y, state) {
@@ -2569,6 +2568,46 @@
             padding-right: 10px;
             width: 100%;
         }
+
+        figure {
+            border: 1px solid var(--fg);
+            padding: 12pt;
+        }
+
+        main {
+            counter-reset: figure 0;
+        }
+
+        figure {
+            counter-increment: figure;
+            overflow: visible;
+            margin: 10pt auto 10pt auto;
+        }
+
+        figcaption::before {
+            content: "Fig. " counter(figure);
+            margin-right: 1rem;
+            font-style: italic;
+        }
+
+        figcaption {
+            margin-top: -1.2em;
+            /* margin-bottom: 1rem; */
+            background-color: var(--bg);
+            padding-right: 10pt;
+            padding-left: 10pt;
+            width: fit-content;
+        }
+
+        a {
+            text-decoration: none;
+            font-style: italic;
+            color: var(--fg);
+        }
+
+        a:link {
+            color: var(--fg);
+        }
     </style>
 
     <style>
@@ -2693,7 +2732,7 @@
                     <div class="hint">
                         HINT: Try clicking or tapping on one of the black circles.
                     </div>
-                    <br />
+                    <br>
                     <div>
                         <span style="font-weight: bolder;" id="intro-game-winner"></span>
                     </div>
@@ -2763,7 +2802,7 @@
 
         </section>
 
-        <hr style="width: 120%; margin-left: -10%; margin-top: 16pt; margin-bottom: 12pt;" />
+        <hr style="width: 120%; margin-left: -10%; margin-top: 16pt; margin-bottom: 12pt;">
 
         <section id="linear-games">
             <h2>Numbers and Konane</h2>
@@ -2782,7 +2821,7 @@
             <p>
                 However, it can still be fun (and useful!) to just look at small sections of games.
             </p>
-            <cgt-konane controls="bottom">
+            <cgt-konane>
                 _xoxoxo_
             </cgt-konane>
 
@@ -2815,7 +2854,7 @@
                 <input type="range" min="1" max="10" value="5" id="slp-range" onchange="updateSLPVariable()">
                 <cgt-value for="#slp-variable"></cgt-value>
             </div>
-            <cgt-konane controls="none" player="white" turn="white" id="slp-variable">
+            <cgt-konane player="white" turn="white" id="slp-variable">
                 _xoxoxoxoxo_
             </cgt-konane>
 
@@ -2844,11 +2883,87 @@
             </p>
 
             <p>
-                Clearly, when there's an odd number of moves
+                In general, when there's an odd number of moves we'll end up with a black stone on either side, giving
+                black no options.
+                White, on the other hand, can jump out on either side.
+                Note this effectively removes two pieces from play; black's piece is captured, and white's piece is no
+                longer reachable.
+            </p>
+            <div style="display: flex; flex-flow: row wrap;">
+                <figure id="figure-1">
+                    <figcaption>N = 7 After One Turn</figcaption>
+                    <cgt-konane controls="none" player="white" turn="white">
+                        _xoxox__o
+                    </cgt-konane>
+                </figure>
+
+                <figure id="figure-2">
+                    <figcaption>N = 7 After Two Turns</figcaption>
+                    <cgt-konane controls="none" player="white" turn="white">
+                        _xox__o_o
+                    </cgt-konane>
+                </figure>
+            </div>
+
+            <p>
+                In both <a href="#fig-1">Fig. 1</a> and <a href="#fig-2">Fig. 2</a> the white pieces to the right, which
+                were moved in the prior turns no longer effect the game at all.
+                That's helpful - we can pretty much forget about these pieces completely!
+            </p>
+            <p>
+                Here: try playing as white in the game below (we'll skip black's turn when they have no moves).
+                Notice how the game's value doesn't change when we remove both pieces.
+
+            </p>
+
+            <div
+                style="display: flex; flex-flow: row wrap; column-gap: 12pt; align-items: center; justify-content: center;">
+                <cgt-konane style="flex: 1 1 auto" id="g-remove-excess-pieces" player="white" turn="white">
+                    _xoxoxox_
+                </cgt-konane>
+                <div
+                    style="display: flex; flex-flow: row; column-gap: 12pt; row-gap: 4pt; justify-content: center; align-items: center;">
+                    <button class="reset" onclick="reset('#g-remove-excess-pieces')"></button>
+                    <cgt-value for="#g-remove-excess-pieces"></cgt-value>
+                </div>
+            </div>
+
+            <script>
+                document
+                    .getElementById("g-remove-excess-pieces")
+                    .addEventListener("konane-move-applied", (ev) => {
+                        ev.target.setTileState(ev.detail.move.toX, ev.detail.move.toY, "empty");
+                    });
+                document
+                    .getElementById("g-remove-excess-pieces")
+                    .addEventListener("game-update", (ev) => {
+                        if (ev.detail.player != "black") return;
+                        const blackHasMoves = !ev.target.game.moves("black").allMoves().next().done;
+                        if (!blackHasMoves) {
+                            ev.target.createNewState("white");
+                        }
+                    })
+            </script>
+
+            <p>
+                So, in this particular configuration of pieces - alternating black and white, with black on both ends -
+                we can think of a move as simply removing two pieces from either end.
+                So when white moves on a solid linear pattern of length 7, we get a solid linear pattern of length 5.
+            </p>
+
+            <p>
+                Under this condition, we only need to know two things to understand <i>all</i> solid linear patterns
+                with an odd length.
+
+            <ol>
+                <li>If we have a solid linear pattern of length <i>N</i> with value <i>V</i>, then what's the value of a
+                    solid linear pattern of length <i>N + 2</i></li>
+
+                <li>What's the value of the first solid linear pattern with an odd length?</li>
+            </ol>
             </p>
         </section>
-
-
     </main>
 </body>
+
 </html>
