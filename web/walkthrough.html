@@ -1835,20 +1835,22 @@
             /* to be aria-friendly we're splitting it into rows */
             #board {
                 display: grid;
-                grid-template-rows: repeat(var(--konane-height), 1fr);
+                grid-template-rows: repeat(var(--konane-height), var(--cell-size, 1fr));
+                grid-template-columns: min-content;
                 background-color: var(--bg);
                 aspect-ratio: var(--konane-width) / var(--konane-height);
             }
 
             .row {
-                display: grid;
-                grid-template-columns: repeat(var(--konane-width), 1fr);
+                display: grid inline;
+                grid-template-columns: repeat(var(--konane-width), var(--cell-size, 1fr));
+                aspect-ratio: var(--konane-width) / 1;
             }
 
             .cell {
                 border: 1px solid var(--fg);
-                min-width: 1rem;
-                min-height: 1rem;
+                /* min-width: var(--cell-size, 1rem);
+                min-height: var(--cell-size, 1rem); */
                 padding: max(.3rem, 10%);
             }
 
@@ -1880,7 +1882,6 @@
                 border: 1px solid var(--fg);
                 aspect-ratio: 1;
             }
-
 
             .white {
                 border-radius: 50%;
@@ -2553,6 +2554,16 @@
             background: var(--bg);
             color: var(--fg);
             font-family: Helvetica, Arial, sans-serif;
+
+            /* main column takes up as much space as possible, up to 780px.
+             * Keeping the paragraph-style content to a smaller region gives us
+             * space for figures, and helps with readability (IMO, of course)
+            */
+            --main-column-width: min(100vw, 780px);
+
+
+            --main-column-margin-left: calc((100vw - var(--main-column-width)) / 2);
+            --main-column-margin-right: calc((100vw - var(--main-column-width)) / 2);
         }
 
         main section+section {
@@ -2563,15 +2574,18 @@
         body>main,
         body>footer {
             margin: auto;
-            max-width: 800px;
-            padding-left: 10px;
-            padding-right: 10px;
-            width: 100%;
+            width: var(--main-column-width);
+            margin-right: var(--main-column-margin-right);
+            margin-left: var(--main-column-margin-right);
         }
 
         figure {
             border: 1px solid var(--fg);
             padding: 12pt;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
         }
 
         main {
@@ -2598,17 +2612,19 @@
         }
 
         figure.example figcaption::before {
-            content: "Example " counter(example);
-            margin-right: 1rem;
+            content: "Ex. " counter(example);
+            margin-right: 0.5rem;
             font-style: italic;
+            font-size: 1.1rem;
         }
 
         figcaption {
-            margin-top: -1.2em;
-            /* margin-bottom: 1rem; */
+            margin-top: -1.5rem;
+            margin-bottom: 0.35rem;
             background-color: var(--bg);
             padding-right: 10pt;
             padding-left: 10pt;
+            font-size: 0.8rem;
             width: fit-content;
         }
 
@@ -2624,6 +2640,50 @@
     </style>
 
     <style>
+        /* Push children into the margin if there's space */
+        .spill-right {
+            width: calc(var(--main-column-margin-right) + var(--main-column-width));
+            padding: 0;
+            margin: 0;
+            display: flex;
+            flex-flow: row wrap;
+            justify-items: center;
+            align-items: center;
+        }
+
+
+        .spill-right>*:nth-child(2) {
+            max-width: var(--main-column-margin-right);
+            flex: 0 0 auto;
+        }
+
+        .spill-right>*:nth-child(1) {
+            max-width: var(--main-column-width);
+            flex: 0 0 auto;
+        }
+
+        /* Push children into the left margin if there's space */
+        .spill-left {
+            width: calc(var(--main-column-margin-left) + var(--main-column-width));
+            padding: 0;
+            margin-left: calc(-1 * var(--main-column-margin-left));
+            display: flex;
+            flex-flow: row-reverse wrap;
+            justify-items: center;
+            align-items: center;
+        }
+
+        div.spill-left>*:nth-child(2) {
+            max-width: var(--main-column-margin-left);
+            flex: 0 1 var(--main-column-margin-left);
+        }
+
+        div.spill-left>*:nth-child(1) {
+            max-width: var(--main-column-width);
+            flex: 0 1 var(--main-column-width);
+        }
+
+
         .side-by-side {
             display: flex;
             flex-flow: row wrap;
@@ -2662,7 +2722,11 @@
 
         cgt-konane {
             padding: 10pt;
-            display: block;
+        }
+
+        figure cgt-konane {
+            display: inline-block;
+            --cell-size: 2rem;
         }
 
 
@@ -2923,7 +2987,7 @@
                 </cgt-konane>
                 <div
                     style="display: flex; flex-flow: row; column-gap: 12pt; row-gap: 4pt; justify-content: center; align-items: center;">
-                    <button class="reset" onclick="reset('#g-remove-excess-pieces')"></button>
+                    <button class="reset" aria-label="reset" onclick="reset('#g-remove-excess-pieces')"></button>
                     <cgt-value for="#g-remove-excess-pieces"></cgt-value>
                 </div>
             </div>
@@ -2962,6 +3026,46 @@
                 <li>What's the value of the first solid linear pattern with an odd length?</li>
             </ol>
             </p>
+
+            <div class="spill-right">
+                <div>
+                    <h3>"Zero"</h3>
+                    <p>
+                        If we have some configuration of pieces, where neither player can move we call that game 0.
+                        Whoever take the first turn in a zero game loses.
+                    </p>
+                </div>
+                <div style="margin: auto">
+                    <figure class="example" style="max-width: 300px">
+                        <figcaption>Zero Game</figcaption>
+                        <cgt-konane id="example-zero-game">
+                            o__
+                            __x
+                        </cgt-konane>
+                    </figure>
+                </div>
+            </div>
+
+            <div class="spill-left">
+                <div>
+                    <h3>Negative Whole Numbers</h3>
+                    <p>
+                        Now, what if black cannot move, and white can only move to some game equal to 0?
+                    </p>
+                </div>
+                <div style="margin: auto">
+                    <figure class="example" style="max-width: 14rem;">
+                        <figcaption>Only White Can Move</figcaption>
+
+                        <cgt-konane id="example-neg-one-game" player="white" turn="white"
+                            style="--cell-size: 2rem; margin: auto">
+                            ox_
+                            ___
+                        </cgt-konane>
+                    </figure>
+                </div>
+            </div>
+
 
             <h2>Numbers</h2>
             <p>We've been talking around the actual values for a while now.
