@@ -2812,7 +2812,15 @@
         grid-column-start: var(--x1, 1);
         grid-row-start: var(--y1, 1);
         background-color: var(--fg);
+    }
 
+    .tree-grid .node.highlight::before {
+        color: var(--fg);
+        position: absolute;
+        content: "▼";
+        transform: rotate(40deg) translateY(calc(-0.5 * (var(--tree-node-size, 1cm) + 12pt)));
+        transform-origin: bottom center;
+        text-align: center;
     }
 
     .tree-grid div[at^="a" i] { --y1: 1 }
@@ -3140,51 +3148,82 @@
                         __x
                     </cgt-konane>
                 </figure>
-            </div>
-
-            <div class="spill-left">
-                <div>
-                    <h3>Negative Whole Numbers</h3>
-                    <p>
-                        Now, bear with me and consider a contrived example
-                        (<a href="#ex-only-white-can-move">Ex. 2</a>).
-                        Black has no options, and white has a single option.
-                        White's only option moves the game to zero.
-                        We'll call this game "-1".
-                    </p>
-
-                    <p> 
-                        To understand why this game is "-1", let's take a step back and look at a game of konane abstractly.
-                        a game of Konane is can be thought of as a family tree.
-                        A "person" in that tree is a particular state of the Konane board.
-                        An line between two states represents a valid move from the parent state to the child state.
-                        <div class="tree-grid" style="padding: 10pt; width: 6cm; float: right;">
-                            <div class="node" at="a1">
+                </div>
+                
+                <div class="spill-left">
+                    <div>
+                        <h3>Negative Whole Numbers</h3>
+                        <p>
+                            Now, bear with me and consider a contrived example
+                            (<a href="#ex-only-white-can-move">Ex. 2</a>).
+                            Black has no options, and white has a single option.
+                            White's only option moves the game to zero.
+                            We'll call this game "-1".
+                        </p>
+                
+                        <p>
+                            To understand why this game is "-1", let's take a step back and look at a game of konane abstractly.
+                            a game of Konane is can be thought of as a family tree.
+                            A "person" in that tree is a particular state of the Konane board.
+                            An line between two states represents a valid move from the parent state to the child state.
+                        </p>
+                
+                        <p>
+                        <div class="tree-grid" id="tree-only-white-can-move" style="padding: 10pt; width: 3cm; float: right;">
+                            <div class="node highlight" at="a1" id="node--1">
                                 -1
                             </div>
                             <div class="link" at="a1" end="b2">
                                 W
                             </div>
-                            <div class="node" at="b2">
+                            <div class="node" at="b2" id="node-0">
                                 0
                             </div>
                         </div>
                         This tree represents the game from <a href="#ex-only-white-can-move">Ex. 2</a>.
-                        The leaf node on the tree is "0", representing the state 
-                        <cgt-konane style="display: inline-block; padding: 0 3pt; --cell-size: 1rem; white-space: nowrap;">__o</cgt-konane> 
+                        The leaf node on the tree is "0", representing the state
+                        <cgt-konane
+                            style="display: inline-block; padding: 0 3pt; --cell-size: 1rem; white-space: nowrap;">__o</cgt-konane>
                         There's a single edge attached to that node, linking it to "-1".
                         Notice there's no edge marked "B", since black has no possible moves.
-                    </p>
-                </div>
-                <figure class="example" id="ex-only-white-can-move">
-                    <figcaption>Only White Can Move</figcaption>
-
-                    <cgt-konane player="white" turn="white" style="--cell-size: 2em;">
-                        ox_
-                        ___
-                    </cgt-konane>
-                </figure>
+                        </p>
+                
+                
+                
+                    </div>
+                    <figure class="example" id="ex-only-white-can-move">
+                        <figcaption>Only White Can Move</figcaption>
+                
+                        <cgt-konane player="white" turn="white" style="--cell-size: 2em;">
+                            ox_
+                            ___
+                        </cgt-konane>
+                    </figure>
             </div>
+
+            <p>
+                Try moving in <a href="#ex-only-white-can-move">Ex. 2</a>, the node corrosponding to the current state will be
+                highlighted.
+            </p>
+            <script>
+                function inlineNegativeOne() {
+                    const game = document.querySelector("#ex-only-white-can-move cgt-konane");
+                    const node1 = document.querySelector("#tree-only-white-can-move #node--1");
+                    const node0 = document.querySelector("#tree-only-white-can-move #node-0");
+
+                    game.addEventListener("game-update", (ev) => {
+                        const { state, player } = ev.detail;
+                        if (state.canonicalForm().partialCompare(new DyadicRational(-1)) === 0) {
+                            node1.classList.add("highlight")
+                            node0.classList.remove("highlight")
+                        } else {
+                            node0.classList.add("highlight")
+                            node1.classList.remove("highlight")
+                        }
+                    })
+                }
+                inlineNegativeOne()
+            </script>
 
 
             <h2>Numbers</h2>
