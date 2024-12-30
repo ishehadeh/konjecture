@@ -2675,7 +2675,7 @@
 
         div.spill-left>*:nth-child(2) {
             max-width: var(--main-column-margin-left);
-            flex: 0 1 var(--main-column-margin-left);
+            flex: 0 1 auto;
         }
 
         div.spill-left>*:nth-child(1) {
@@ -2785,6 +2785,100 @@
         }
     </style>
 
+
+<style>
+    .tree-grid {
+        display: inline-grid;
+        grid-template-columns: repeat(auto-fill, var(--tree-node-size, 1cm));
+        grid-template-rows: repeat(auto-fill, var(--tree-node-size, 1cm));
+        row-gap: calc(var(--tree-node-size, 1cm) * 0.4);
+        column-gap: calc(var(--tree-node-size, 1cm) * 0.4);
+    }
+
+
+    .tree-grid .node {
+        color: var(--bg);
+        border-radius: 50%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        /* line-height: 1.2rem; */
+        aspect-ratio: 1;
+        grid-column-start: var(--x1, 1);
+        grid-row-start: var(--y1, 1);
+        background-color: var(--fg);
+
+    }
+
+    .tree-grid div[at^="a" i] { --y1: 1 }
+    .tree-grid div[at^="b" i] { --y1: 2 }
+    .tree-grid div[at^="c" i] { --y1: 3 }
+    .tree-grid div[at^="d" i] { --y1: 4 }
+    .tree-grid div[at^="e" i] { --y1: 5 }
+    .tree-grid div[at^="f" i] { --y1: 6 }
+    .tree-grid div[at^="g" i] { --y1: 7 }
+    .tree-grid div[at^="h" i] { --y1: 8 }
+    .tree-grid div[at^="i" i] { --y1: 9 }
+    .tree-grid div[at$="1" i] { --x1: 1 }
+    .tree-grid div[at$="2" i] { --x1: 2 }
+    .tree-grid div[at$="3" i] { --x1: 3 }
+    .tree-grid div[at$="4" i] { --x1: 4 }
+    .tree-grid div[at$="5" i] { --x1: 5 }
+    .tree-grid div[at$="6" i] { --x1: 6 }
+    .tree-grid div[at$="7" i] { --x1: 7 }
+    .tree-grid div[at$="8" i] { --x1: 8 }
+    .tree-grid div[at$="9" i] { --x1: 9 }
+
+
+    .tree-grid div[end^="a" i] { --y2: 1 }
+    .tree-grid div[end^="b" i] { --y2: 2 }
+    .tree-grid div[end^="c" i] { --y2: 3 }
+    .tree-grid div[end^="d" i] { --y2: 4 }
+    .tree-grid div[end^="e" i] { --y2: 5 }
+    .tree-grid div[end^="f" i] { --y2: 6 }
+    .tree-grid div[end^="g" i] { --y2: 7 }
+    .tree-grid div[end^="h" i] { --y2: 8 }
+    .tree-grid div[end$="1" i] { --x2: 1 }
+    .tree-grid div[end$="2" i] { --x2: 2 }
+    .tree-grid div[end$="3" i] { --x2: 3 }
+    .tree-grid div[end$="4" i] { --x2: 4 }
+    .tree-grid div[end$="5" i] { --x2: 5 }
+    .tree-grid div[end$="6" i] { --x2: 6 }
+    .tree-grid div[end$="7" i] { --x2: 7 }
+    .tree-grid div[end$="8" i] { --x2: 8 }
+    .tree-grid div[end$="9" i] { --x2: 9 }
+
+    .tree-grid .link {
+        grid-column-start: min(var(--x1), var(--x2));
+        grid-column-end: calc(max(var(--x1), var(--x2)) + 1);
+        grid-row-start: min(var(--y1), var(--y2));
+        grid-row-end: calc(max(var(--y1), var(--y2)) + 1);
+        background-color: var(--fg);
+
+        display: block;
+        background-color: transparent;
+        text-align: center;
+        font-size: 0.7rem;
+        z-index: -1;
+        transform: rotate(calc(45deg * (var(--y2) - var(--y1)) / (var(--x2) - var(--x1))));
+        display: grid;
+        grid-template-columns: 100%;
+        grid-template-rows: 1fr 4px 1fr;
+        justify-content: center;
+        align-items: center;
+        color: var(--fg);
+    }
+
+    .tree-grid .link::before {
+        grid-row: 2;
+        width: 100%;
+        height: 100%;
+        display: block;
+        content: '';
+        background-color: var(--fg);
+    }
+</style>
 </head>
 
 <body>
@@ -3019,13 +3113,13 @@
                 Under this condition, we only need to know two things to understand <i>all</i> solid linear patterns
                 with an odd length.
 
+            </p>
             <ol>
                 <li>If we have a solid linear pattern of length <i>N</i> with value <i>V</i>, then what's the value of a
                     solid linear pattern of length <i>N + 2</i></li>
 
                 <li>What's the value of the first solid linear pattern with an odd length?</li>
             </ol>
-            </p>
 
             <div class="spill-right">
                 <div>
@@ -3035,37 +3129,71 @@
                         Whoever take the first turn in a zero game loses.
                     </p>
                 </div>
-                <div style="margin: auto">
-                    <figure class="example" style="max-width: 300px">
-                        <figcaption>Zero Game</figcaption>
-                        <cgt-konane id="example-zero-game">
-                            o__
-                            __x
-                        </cgt-konane>
-                    </figure>
-                </div>
+                <figure class="example">
+                    <figcaption>Zero Game</figcaption>
+                    <cgt-konane id="example-zero-game">
+                        o__
+                        __x
+                    </cgt-konane>
+                </figure>
             </div>
 
             <div class="spill-left">
                 <div>
                     <h3>Negative Whole Numbers</h3>
                     <p>
-                        Now, what if black cannot move, and white can only move to some game equal to 0?
+                        Now, bear with me and consider a contrived example
+                        (<a href="#ex-only-white-can-move">Ex. 2</a>).
+                        Black has no options, and white has a single option.
+                        White's only option moves the game to zero.
+                        We'll call this game "-1".
+                    </p>
+
+                    <p> 
+                        To understand why this game is "-1", let's take a step back and look at a game of konane abstractly.
+                        a game of Konane is can be thought of as a family tree.
+                        A "person" in that tree is a particular state of the Konane board.
+                        An line between two states represents a valid move from the parent state to the child state.
+                        <div class="tree-grid" style="padding: 10pt; width: 6cm; float: right;">
+                            <div class="node" at="a1">
+                                -1
+                            </div>
+                            <div class="link" at="a1" end="b2">
+                                W
+                            </div>
+                            <div class="node" at="b2">
+                                0
+                            </div>
+                        </div>
+                        This tree represents the game from <a href="#ex-only-white-can-move">Ex. 2</a>.
+                        The leaf node on the tree is "0", representing the state 
+                        <cgt-konane style="display: inline-block; padding: 0 3pt; --cell-size: 1rem; white-space: nowrap;">__o</cgt-konane> 
+                        There's a single edge attached to that node, linking it to "-1".
+                        Notice there's no edge marked "B", since black has no possible moves.
                     </p>
                 </div>
-                <div style="margin: auto">
-                    <figure class="example" style="max-width: 14rem;">
-                        <figcaption>Only White Can Move</figcaption>
+                <figure class="example" id="ex-only-white-can-move">
+                    <figcaption>Only White Can Move</figcaption>
 
-                        <cgt-konane id="example-neg-one-game" player="white" turn="white"
-                            style="--cell-size: 2rem; margin: auto">
-                            ox_
-                            ___
-                        </cgt-konane>
-                    </figure>
-                </div>
+                    <cgt-konane player="white" turn="white" style="--cell-size: 2em;">
+                        ox_
+                        ___
+                    </cgt-konane>
+                </figure>
             </div>
+            <div class="tree-grid" style="padding: 10pt; width: 100%;">
+                <div class="node" at="a4">-1/2</div>
 
+                <div class="link" at="a4" end="b3">B</div>
+                <div class="node" at="b3">-1</div>
+
+                <div class="link" at="a4" end="b5">W</div>
+                <div class="node" at="b5">0</div>
+
+                <div class="link" at="b3" end="c4">W</div>
+                <div class="node" at="c4">0</div>
+
+            </div>
 
             <h2>Numbers</h2>
             <p>We've been talking around the actual values for a while now.
