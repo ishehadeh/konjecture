@@ -1836,7 +1836,7 @@
             #board {
                 display: grid;
                 grid-template-rows: repeat(var(--konane-height), var(--cell-size, 1fr));
-                grid-template-columns: min-content;
+                /* grid-template-columns: min-content; */
                 background-color: var(--bg);
                 aspect-ratio: var(--konane-width) / var(--konane-height);
             }
@@ -2654,12 +2654,14 @@
 
         .spill-right>*:nth-child(2) {
             max-width: var(--main-column-margin-right);
+            min-width: fit-content(var(--main-column-margin-right));
             flex: 0 0 auto;
         }
 
         .spill-right>*:nth-child(1) {
             max-width: var(--main-column-width);
-            flex: 0 0 auto;
+            min-width: fit-content(var(--main-column-width));
+            flex: 0 1 auto;
         }
 
         /* Push children into the left margin if there's space */
@@ -2675,11 +2677,13 @@
 
         div.spill-left>*:nth-child(2) {
             max-width: var(--main-column-margin-left);
+            min-width: fit-content(var(--main-column-margin-left));
             flex: 0 1 auto;
         }
 
         div.spill-left>*:nth-child(1) {
             max-width: var(--main-column-width);
+            min-width: fit-content(var(--main-column-width));
             flex: 0 1 var(--main-column-width);
         }
 
@@ -3181,19 +3185,7 @@
                     </cgt-konane>
                 </figure>
             </div>
-            <div class="tree-grid" style="padding: 10pt; width: 100%;">
-                <div class="node" at="a4">-1/2</div>
 
-                <div class="link" at="a4" end="b3">B</div>
-                <div class="node" at="b3">-1</div>
-
-                <div class="link" at="a4" end="b5">W</div>
-                <div class="node" at="b5">0</div>
-
-                <div class="link" at="b3" end="c4">W</div>
-                <div class="node" at="c4">0</div>
-
-            </div>
 
             <h2>Numbers</h2>
             <p>We've been talking around the actual values for a while now.
