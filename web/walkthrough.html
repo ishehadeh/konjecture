@@ -1943,6 +1943,13 @@
              * @type {["black"] | ["white"] | ["black", "white"] | []}
              */
             #interactiveColor = ["black"];
+
+
+            /** The color that can be controlled by interacting with the site
+             * @type {["black"] | ["white"] | ["black", "white"] | []}
+             */
+            get interactiveColors()  { return [...this.#interactiveColor] }
+
             #proposedMoves = [];
             #history = [];
             #historyIdx = -1;
@@ -2804,11 +2811,14 @@
         color: var(--bg);
         border-radius: 50%;
         display: flex;
+        font-size: min(8pt, calc(var(--tree-node-size, 1cm) * 0.5));
+        width: var(--tree-node-size, 1cm);
+        height: var(--tree-node-size, 1cm);
         flex-direction: column;
         align-items: center;
         justify-content: center;
         /* line-height: 1.2rem; */
-        aspect-ratio: 1;
+        aspect-ratio: 1 / 1;
         grid-column-start: var(--x1, 1);
         grid-row-start: var(--y1, 1);
         background-color: var(--fg);
@@ -2821,6 +2831,7 @@
         transform: rotate(40deg) translateY(calc(-0.5 * (var(--tree-node-size, 1cm) + 12pt)));
         transform-origin: bottom center;
         text-align: center;
+        font-size: small;
     }
 
     .tree-grid div[at^="a" i] { --y1: 1 }
@@ -3083,7 +3094,6 @@
             <p>
                 Here: try playing as white in the game below (we'll skip black's turn when they have no moves).
                 Notice how the game's value doesn't change when we remove both pieces.
-
             </p>
 
             <div
@@ -3099,20 +3109,25 @@
             </div>
 
             <script>
+                function skipComputerTurnIfEmpty(selector) {
+                    const elem = document.querySelector(selector);
+                    elem.addEventListener("game-update", (ev) => {
+                            if (elem.interactiveColors.includes(ev.detail.player)) {
+                                return;
+                            }
+
+                            const hasMoves = !ev.target.game.moves(ev.detail.player).allMoves().next().done;
+                            if (!hasMoves) {
+                                ev.target.createNewState(ev.detail.player == "black" ? "white" : "black");
+                            }
+                    })
+                }
                 document
                     .getElementById("g-remove-excess-pieces")
                     .addEventListener("konane-move-applied", (ev) => {
                         ev.target.setTileState(ev.detail.move.toX, ev.detail.move.toY, "empty");
                     });
-                document
-                    .getElementById("g-remove-excess-pieces")
-                    .addEventListener("game-update", (ev) => {
-                        if (ev.detail.player != "black") return;
-                        const blackHasMoves = !ev.target.game.moves("black").allMoves().next().done;
-                        if (!blackHasMoves) {
-                            ev.target.createNewState("white");
-                        }
-                    })
+                skipComputerTurnIfEmpty("#g-remove-excess-pieces");
             </script>
 
             <p>
@@ -3162,21 +3177,21 @@
                         </p>
                 
                         <p>
-                            To understand why this game is "-1", let's take a step back and look at a game of konane abstractly.
-                            a game of Konane is can be thought of as a family tree.
+                            To understand why this game is "-1", let's take a step back and look at a game of Konane in the abstract.
+                            A game of Konane is can be thought of as a family tree.
                             A "person" in that tree is a particular state of the Konane board.
                             An line between two states represents a valid move from the parent state to the child state.
                         </p>
                 
                         <p>
                         <div class="tree-grid" id="tree-only-white-can-move" style="padding: 10pt; width: 3cm; float: right;">
-                            <div class="node highlight" at="a1" id="node--1">
+                            <div class="node highlight" at="a1" data-value="-1">
                                 -1
                             </div>
                             <div class="link" at="a1" end="b2">
                                 W
                             </div>
-                            <div class="node" at="b2" id="node-0">
+                            <div class="node" at="b2" id="node-0" data-value="0">
                                 0
                             </div>
                         </div>
@@ -3205,26 +3220,93 @@
                 Try moving in <a href="#ex-only-white-can-move">Ex. 2</a>, the node corrosponding to the current state will be
                 highlighted.
             </p>
-            <script>
-                function inlineNegativeOne() {
-                    const game = document.querySelector("#ex-only-white-can-move cgt-konane");
-                    const node1 = document.querySelector("#tree-only-white-can-move #node--1");
-                    const node0 = document.querySelector("#tree-only-white-can-move #node-0");
 
+
+            <script>
+                function linkGameAndTree(gameSelector, treeSelector) {
+                    const game = document.querySelector(gameSelector);
+                    const tree = document.querySelector(treeSelector);
                     game.addEventListener("game-update", (ev) => {
                         const { state, player } = ev.detail;
-                        if (state.canonicalForm().partialCompare(new DyadicRational(-1)) === 0) {
-                            node1.classList.add("highlight")
-                            node0.classList.remove("highlight")
-                        } else {
-                            node0.classList.add("highlight")
-                            node1.classList.remove("highlight")
-                        }
+                        const str = state.canonicalForm().toString()
+                        tree.querySelectorAll(".highlight").forEach(el => {
+                            el.classList.remove("highlight");
+                        });
+                        tree.querySelectorAll(`*[data-value="${str}"]`).forEach(el => {
+                            el.classList.add("highlight");
+                        });
                     })
                 }
-                inlineNegativeOne()
+                linkGameAndTree("#ex-only-white-can-move cgt-konane", "#tree-only-white-can-move");
             </script>
 
+            <h2>Games All the Way Down</h2>
+            <p>
+                Like in the above example with -1, in order to fully analyze any Konane position we need to understand the options of each player.
+                Actually, that's all we care about: what board states can black move to, and what board states can white move to.
+                Take games below as an example:
+                <div style="display: flex; flex-flow: row wrap; width: 100%; --cell-size: 2rem">
+                    <cgt-konane>
+                        ___
+                        ___
+                        ___ox
+                        ___
+                        ___
+                    </cgt-konane>
+                    <cgt-konane>
+                        ___
+                        ___
+                        xo___
+                        ___
+                        ___
+                    </cgt-konane>
+                    <cgt-konane>
+                        __x_
+                        __o_
+                        _____
+                        ___
+                        ___
+                    </cgt-konane>
+                </div>
+
+                No matter what, the board always ends up in the same state.
+                So, in some sense aren't all these games the same?
+            </p>
+            <p>
+                Absolutely. But, anything can be true when your playing with definitions.
+                For example: we can just focus on who wins, that's what we really care about.
+                Could we say all games that black wins are "the same"?
+            </p>
+            <p>
+                Definitely. We could also be strict about it - say that two boards have to be <i>exactly</i> the same to be "the same".
+            </p>
+            
+            <h2>Reconsidering Linear Patterns</h2>
+            <p>
+                Now, with that little bit of theory out of the way let's get back to our solid linear patterns.
+                Let's make a tree for N=7.
+            </p>
+            <div style="display: flex; flex-flow: row wrap;">
+                <div class="tree-grid" id="tree-slp-7-with-tree" style="padding: 10pt; --tree-node-size: .75cm;">
+                    <div class="node highlight" at="a1" data-value="-3">-3</div>
+                    <div class="link" at="a1" end="b2"></div>
+
+                    <div class="node" at="b2" data-value="-2">-2</div>
+                    <div class="link" at="b2" end="c3"></div>
+
+                    <div class="node" at="c3" data-value="-1">-1</div>
+                    <div class="link" at="c3" end="d4"></div>
+
+                    <div class="node" at="d4" data-value="0">0</div>
+                </div>
+                <cgt-konane id="ex-slp-7-with-tree" player="white" turn="white" style="--cell-size: 2em;">
+                    _xoxoxox_
+                </cgt-konane>
+            </div>
+            <script>
+                linkGameAndTree("#ex-slp-7-with-tree", "#tree-slp-7-with-tree");
+                skipComputerTurnIfEmpty("#ex-slp-7-with-tree");
+            </script>
 
             <h2>Numbers</h2>
             <p>We've been talking around the actual values for a while now.
