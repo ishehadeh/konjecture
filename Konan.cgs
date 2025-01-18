@@ -1,0 +1,54 @@
+// Konane is a game played on a rectangular grid
+singleton class Konane extends game.grid.GridRuleset
+  // Define a nested class to represent specific positions
+  class Position(grid as Grid) extends GridGame
+    /// Get a range from this position to the border in the direction dir
+    def DistToBorder(dir as Coordinates, pos as Coordinates) begin
+        if dir == Coordinates.East then
+            grid.ColCount - pos.Col
+        elseif dir == Coordinates.West then
+            pos.Col
+        elseif dir == Coordinates.North then
+            pos.Row
+        elseif dir == Coordinates.South then
+            grid.RowCount - pos.Row
+        end
+    end
+
+     // Define the options of this position
+    override def Options(player as Player) begin
+
+      // The ID number of the cells representing the current player
+      var us := player.Ordinal;
+
+      // The ID number of the cells representing the opposing player
+      var them := player.Opponent.Ordinal;
+
+      // 1. Iterate through all our pieces ("coord" is the current piece)
+      for coord in (grid FindAll us)
+      // 2. for any given "coord" check each direction
+      for direction in Coordinates.Orthogonal
+      // 3. determine how many spaces are available in the given direction
+      for offset from 1 to DistToBorder(direction, coord) by 2
+      while grid[coord + direction * offset] == them and grid[coord + direction + direction * offset] == 0
+      yield
+        Position(grid Updated {
+            coord => 0,
+            coord + direction + direction * offset => us
+          } Updated {
+            (coord + direction * i) => 0 for i from 1 to offset by 2
+          });
+      end
+
+    end
+
+  end
+
+  // Define the characters used to represent blank spaces, black stones,
+  // and white stones when Konane positions are created
+  override def CharMap := ".xo";
+
+  // Define the icons used to display blank spaces, black stones, and white stones when Clobber positions are displayed in CGSuite UI
+  override def Icons := [Icon.Blank, Icon.BlackStone, Icon.WhiteStone];
+
+end
