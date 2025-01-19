@@ -2587,9 +2587,9 @@
         }
     </style>
 
-    <style id="figure-styles">
+    <style id="Figure Styles">
         figure {
-            border: 1px solid var(--fg);
+            /* border: 1px solid var(--fg); */
             padding: 12pt;
             display: flex;
             align-items: center;
@@ -2623,16 +2623,26 @@
             content: "Ex. " counter(example);
             margin-right: 0.5rem;
             font-style: italic;
-            font-size: 1.1rem;
+            font-size: 0.9rem;
         }
 
-        figcaption {
+        figcaption + * {
             margin-top: -1.5rem;
             margin-bottom: 0.35rem;
             background-color: var(--bg);
             padding-right: 10pt;
             padding-left: 10pt;
-            font-size: 0.8rem;
+            font-size: 1rem;
+            width: fit-content;
+        }
+
+        * figcaption {
+            margin-bottom: -1.5rem;
+            margin-top: 0.35rem;
+            background-color: var(--bg);
+            padding-right: 10pt;
+            padding-left: 10pt;
+            font-size: 1rem;
             width: fit-content;
         }
     </style>
@@ -2956,558 +2966,55 @@
         <section id="introduction">
             <h1>Let's Play Kōnane&hellip;</h1>
 
-            <div class="horizontal stack">
-                <cgt-konane id="intro-game" controls="right">
-                    ____
-                    _xo_
-                    __xo_
-                    _____
-                </cgt-konane>
-
-                <p>
-                    This is Konane, an ancient Hawaiian game, somewhat similar to checkers.
-                </p>
-            </div>
-            <p>
-                &nbsp;&nbsp;&nbsp;&nbsp;Kōnane is a 2 player ancient Hawaiian game played on a rectangular grid.
-                One player uses black pieces, and the other white pieces.
-                To move a piece, a player must jump over one of their opponent's pieces.
-                The first player unable to make a move loses.
-            </p>
-
-            <p>Any number of jumps can be made in a single direction.
-                For example, in this game you (black), can capture 1, 2, 3, or 4 white pieces.
-            </p>
-            <div style="display: flex; flex-flow: row; column-gap: 12pt;">
-                <cgt-konane style="padding: 4pt; flex-grow: 1" id="game-long-jump" controls="bottom">
-                    xo_o_o_o_
-                </cgt-konane>
-                <button class="reset" onclick="reset('#intro-final-game')"></button>
-            </div>
-
-            <p>Finally, here's a full board - have fun!</p>
-            <div class="flex-column-center">
-                <div class="game-toolbar-row">
-                    <button class="undo" onclick="undo('#intro-final-game')"></button>
-                    <button class="reset" onclick="reset('#intro-final-game')"></button>
-                    <button class="redo" onclick="redo('#intro-final-game')"></button>
-                    <cgt-value for="#intro-final-game"></cgt-value>
-                </div>
-                <cgt-konane id="intro-final-game" style="flex-grow: 1">
-                    xoxo
-                    oxoxo
-                    x__ox
-                </cgt-konane>
-            </div>
-
-        </section>
-
-        <hr class="separater-h">
-
-
-        <section id="game-trees">
-            <h2>Games All The Way Down</h2>
-
-            <p>
-                This page is a guide on how to take the fun out of Kōnane.
-                Luckily, Kōnane is an <i>intersting</i> game, it's not easy to ruin.
-                In fact, Kōnane is so interesting that we can't even do so using a computer.
-            </p>
-
-            <h3>Game Plan</h3>
-            <p>
-                How do we take the fun out of a game?
-                The idea's pretty simple:
-
-            <ol>
-                <li>Determine who wins Kōnane positions with only a few pieces.</li>
-                <li>Use those positions to determine who wins slightly more complex positions</li>
-            </ol>
-            </p>
-
-
-            <div class="spill-right">
-                <p>
-
-                    Okay, that doesn't help much - let's start from the bottom:
-                    <a href="ex-simple-p-class">Ex. 1</a> shows a game with a single piece.
-                    Say you go to take your turn on this game:
-
-                    Whether you play black or white, you'd have no moves and promptly lose.
-                    Put another way: your opponent, the player who moved <i>previously</i>, would win.
-                </p>
-
-
-                <div>
-                    <figure id="ex-simple-p-class" class="example">
-                        <figcaption>A game with 1 piece</figcaption>
-                        <cgt-konane>
-                            ____
-                            _x__
-                            ____
-                        </cgt-konane>
-                    </figure>
-                </div>
-            </div>
-
-            <div class="spill-left">
-                <p>
-
-                    Okay, that doesn't help much - let's start from the bottom:
-                    <a href="ex-simple-n-class">Ex. 2</a> shows a game with a single piece.
-                    Say you go to take your turn on this game:
-
-                    Whether you play black or white, you'd have no moves and promptly lose.
-                    Put another way: your opponent, the player who moved <i>previously</i>, would win.
-                </p>
-
-
-                <div>
-                    <figure id="ex-simple-n-class" class="example">
-                        <figcaption>A game with 2 pieces</figcaption>
-                        <cgt-konane style="--cell-size: 2rem">
-                            ____
-                            _xo_
-                            ____
-                        </cgt-konane>
-                    </figure>
-                </div>
-            </div>
-
             <div>
+                <figure id="ex1" class="example">
+                    <cgt-konane id="intro-game" controls="right">
+                        xoxox
+                        oxo_o
+                        xo_ox
+                        oxoxo
+                    </cgt-konane>
+                    <figcaption>Kōnane</figcaption>
+                </figure>
+
                 <p>
-                    We'll sort positions into four <i>outcome classess</i>: 𝓟, 𝓝, 𝓛, 𝓡
-                    <a href="ex-simple-p-class">Ex. 1</a>
-                <ul>
-                    <li>If the <i>first</i> player to move loses, then the game is in outcome class 𝓟</li>
-                    <li>If the <i>first</i> player to move wins, then the game is in outcome class 𝓝</li>
-                    <li>If <i>white always wins</i>, then the game is in outcome class 𝓡</li>
-                    <li>If <i>black always wins</i>, then the game is in outcome class 𝓛</li>
-                </ul>
+                    Kōnane is an ancient Hawaiian game in the vein of checkers.
+                    <a href="#ex1">Ex. 1</a> is playable, if you click (or tap) on one of the black pieces, the game will highlight available moves.
+                </p>
+
+
+                <p>
+                    Here's the rule: on your turn, you must <i>jump</i> over <i>one or more</i> of your opponents pieces, in single direction, into an empty space, thus remove's your opponents pieces from play.
+                </p>
+                <div class="stack horizontal">
+                    <figure id="ex2" class="example">
+                        <cgt-konane id="intro-game" controls="right">
+                            _____
+                            _____
+                            ___ox
+                            _____
+                        </cgt-konane>
+                        <figcaption>One Jump</figcaption>
+                    </figure>
+
+                    <figure id="ex3" class="example">
+                        <cgt-konane id="intro-game" controls="right">
+                            _____
+                            _____
+                            _o_ox
+                            _____
+                        </cgt-konane>
+                        <figcaption>Two Jumps</figcaption>
+                    </figure>
+                </div>
+
+                <p>
+                    The first player that can't move on their turn loses. 
+                    <a href="#ex2">Ex. 2</a> and <a href="#ex3">Ex. 3</a> showcase the <i>jumping</i> mechanic.
+                    Try moving in those games by clicking on the black piece.
                 </p>
             </div>
-        </section>
-
-        <hr class="separater-h">
-
-        <section id="linear-games">
-            <h2>Numbers and Kōnane</h2>
-
-            <p>
-                That text under the board - "1", "*", maybe even "↓" - is the game's "value".
-                It's an abstract way to describe a two player game, basically a number to say how "good" the game is for
-                each player.
-                It doesn't take all the fun out of it though!
-                <span style="opacity: 40%; font-size: 0.8em">(un)</span>fortunately for us the game is too complex to
-                fully analyze.
-                That's why the games above were so small, any bigger and your browser would start to complain about this
-                page not responding.
-            </p>
-
-            <p>
-                However, it can still be fun (and useful!) to just look at small sections of games.
-            </p>
-            <cgt-konane>
-                _xoxoxo_
-            </cgt-konane>
-
-
-            <p>
-                This is a simple linear pattern.
-                By analyzing the game we can determine who wins just by the number of white and black pieces.
-                Let's start with some simple games.
-            </p>
-            <p>
-                <cgt-konane class="inline-left fig-size2" controls="none">
-                    _xo_
-                </cgt-konane>
-                When we're just playing with two pieces it's pretty easy.
-                Whoever goes first captures the other player's piece.
-                With their only piece gone the other player loses.
-            </p>
-            <p>
-                <cgt-konane class="inline-right fig-size3" player="white" turn="white" controls="none">
-                    _xox_
-                </cgt-konane>
-                Playing with three pieces isn't much more exciting.
-                Black can't move at all, so if they play first they'll lose instantly.
-            </p>
-
-            <p>
-                Let's cut to the chase: drag the slider to create a game with <i>N</i> pieces:
-            </p>
-            <div style="display: grid; grid-template-columns: 6fr 1fr;column-gap: 1em">
-                <input type="range" min="1" max="10" value="5" id="slp-range" onchange="updateSLPVariable()">
-                <cgt-value for="#slp-variable"></cgt-value>
-            </div>
-            <cgt-konane player="white" turn="white" id="slp-variable">
-                _xoxoxoxoxo_
-            </cgt-konane>
-
-            <script>
-                function updateSLPVariable() {
-                    const fullGame = "xoxoxoxoxo";
-                    const n = document.getElementById("slp-range").value;
-                    const sect = fullGame.slice(0, n) + "_".repeat(fullGame.length - n);
-                    document.getElementById("slp-variable").innerText = "_" + sect + "_";
-                }
-                document.getElementById("slp-variable").addEventListener("game-update", (ev) => {
-                    if (ev.detail.player != "black") return;
-                    const blackHasMoves = !ev.target.game.moves("black").allMoves().next().done;
-                    if (!blackHasMoves) {
-                        ev.target.createNewState("white");
-                    }
-                })
-                updateSLPVariable()
-            </script>
-
-            <p>
-                Notice that the games with an odd number of pieces are all valued at some number less than zero.
-                Numbers less than zero indicate a certain win for white.
-                Try it! we'll your playing white in games above, and we'll skip black's turn if they don't have any
-                moves.
-            </p>
-
-            <p>
-                In general, when there's an odd number of moves we'll end up with a black stone on either side, giving
-                black no options.
-                White, on the other hand, can jump out on either side.
-                Note this effectively removes two pieces from play; black's piece is captured, and white's piece is no
-                longer reachable.
-            </p>
-            <div style="display: flex; flex-flow: row wrap;">
-                <figure id="figure-1">
-                    <figcaption>N = 7 After One Turn</figcaption>
-                    <cgt-konane controls="none" player="white" turn="white">
-                        _xoxox__o
-                    </cgt-konane>
-                </figure>
-
-                <figure id="figure-2">
-                    <figcaption>N = 7 After Two Turns</figcaption>
-                    <cgt-konane controls="none" player="white" turn="white">
-                        _xox__o_o
-                    </cgt-konane>
-                </figure>
-            </div>
-
-            <p>
-                In both <a href="#fig-1">Fig. 1</a> and <a href="#fig-2">Fig. 2</a> the white pieces to the right, which
-                were moved in the prior turns no longer effect the game at all.
-                That's helpful - we can pretty much forget about these pieces completely!
-            </p>
-            <p>
-                Here: try playing as white in the game below (we'll skip black's turn when they have no moves).
-                Notice how the game's value doesn't change when we remove both pieces.
-            </p>
-
-            <div
-                style="display: flex; flex-flow: row wrap; column-gap: 12pt; align-items: center; justify-content: center;">
-                <cgt-konane style="flex: 1 1 auto" id="g-remove-excess-pieces" player="white" turn="white">
-                    _xoxoxox_
-                </cgt-konane>
-                <div
-                    style="display: flex; flex-flow: row; column-gap: 12pt; row-gap: 4pt; justify-content: center; align-items: center;">
-                    <button class="reset" aria-label="reset" onclick="reset('#g-remove-excess-pieces')"></button>
-                    <cgt-value for="#g-remove-excess-pieces"></cgt-value>
-                </div>
-            </div>
-
-            <script>
-                function skipComputerTurnIfEmpty(selector) {
-                    const elem = document.querySelector(selector);
-                    elem.addEventListener("game-update", (ev) => {
-                        if (elem.interactiveColors.includes(ev.detail.player)) {
-                            return;
-                        }
-
-                        const hasMoves = !ev.target.game.moves(ev.detail.player).allMoves().next().done;
-                        if (!hasMoves) {
-                            ev.target.createNewState(ev.detail.player == "black" ? "white" : "black");
-                        }
-                    })
-                }
-                document
-                    .getElementById("g-remove-excess-pieces")
-                    .addEventListener("konane-move-applied", (ev) => {
-                        ev.target.setTileState(ev.detail.move.toX, ev.detail.move.toY, "empty");
-                    });
-                skipComputerTurnIfEmpty("#g-remove-excess-pieces");
-            </script>
-
-            <p>
-                So, in this particular configuration of pieces - alternating black and white, with black on both ends -
-                we can think of a move as simply removing two pieces from either end.
-                So when white moves on a solid linear pattern of length 7, we get a solid linear pattern of length 5.
-            </p>
-
-            <p>
-                Under this condition, we only need to know two things to understand <i>all</i> solid linear patterns
-                with an odd length.
-
-            </p>
-            <ol>
-                <li>If we have a solid linear pattern of length <i>N</i> with value <i>V</i>, then what's the value of a
-                    solid linear pattern of length <i>N + 2</i></li>
-
-                <li>What's the value of the first solid linear pattern with an odd length?</li>
-            </ol>
-
-            <div class="spill-right">
-                <div>
-                    <h3>"Zero"</h3>
-                    <p>
-                        If we have some configuration of pieces, where neither player can move we call that game 0.
-                        Whoever take the first turn in a zero game loses.
-                    </p>
-                </div>
-
-                <figure class="example" class="spill">
-                    <figcaption>Zero Game</figcaption>
-                    <cgt-konane id="example-zero-game">
-                        o__
-                        __x
-                    </cgt-konane>
-                </figure>
-            </div>
-
-            <div class="spill-left">
-                <div>
-                    <h3>Negative Whole Numbers</h3>
-                    <p>
-                        Now, bear with me and consider a contrived example
-                        (<a href="#ex-only-white-can-move">Ex. 2</a>).
-                        Black has no options, and white has a single option.
-                        White's only option moves the game to zero.
-                        We'll call this game "-1".
-                    </p>
-
-                    <p>
-                        To understand why this game is "-1", let's take a step back and look at a game of Konane in the
-                        abstract.
-                        A game of Konane is can be thought of as a family tree.
-                        A "person" in that tree is a particular state of the Konane board.
-                        An line between two states represents a valid move from the parent state to the child state.
-                    </p>
-
-                    <p>
-                    <div class="tree-grid" id="tree-only-white-can-move"
-                        style="padding: 10pt; width: 3cm; float: right;">
-                        <div class="node highlight" at="a1" data-value="-1">
-                            -1
-                        </div>
-                        <div class="link" at="a1" end="b2">
-                            W
-                        </div>
-                        <div class="node" at="b2" id="node-0" data-value="0">
-                            0
-                        </div>
-                    </div>
-                    This tree represents the game from <a href="#ex-only-white-can-move">Ex. 2</a>.
-                    The leaf node on the tree is "0", representing the state
-                    <cgt-konane
-                        style="display: inline-block; padding: 0 3pt; --cell-size: 1rem; white-space: nowrap;">__o</cgt-konane>
-                    There's a single edge attached to that node, linking it to "-1".
-                    Notice there's no edge marked "B", since black has no possible moves.
-                    </p>
-
-
-
-                </div>
-                <figure class="example" id="ex-only-white-can-move">
-                    <figcaption>Only White Can Move</figcaption>
-
-                    <cgt-konane player="white" turn="white" style="--cell-size: 2em;">
-                        ox_
-                        ___
-                    </cgt-konane>
-                </figure>
-            </div>
-
-            <p>
-                Try moving in <a href="#ex-only-white-can-move">Ex. 2</a>, the node corrosponding to the current state
-                will be
-                highlighted.
-            </p>
-
-
-            <script>
-                function linkGameAndTree(gameSelector, treeSelector) {
-                    const game = document.querySelector(gameSelector);
-                    const tree = document.querySelector(treeSelector);
-                    game.addEventListener("game-update", (ev) => {
-                        const { state, player } = ev.detail;
-                        const str = state.canonicalForm().toString()
-                        tree.querySelectorAll(".highlight").forEach(el => {
-                            el.classList.remove("highlight");
-                        });
-                        tree.querySelectorAll(`*[data-value="${str}"]`).forEach(el => {
-                            el.classList.add("highlight");
-                        });
-                    })
-                }
-                linkGameAndTree("#ex-only-white-can-move cgt-konane", "#tree-only-white-can-move");
-            </script>
-
-            <h2>Games All the Way Down</h2>
-            <p>
-                Like in the above example with -1, in order to fully analyze any Konane position we need to understand
-                the options of each player.
-                Actually, that's all we care about: what board states can black move to, and what board states can white
-                move to.
-                Take games below as an example:
-            <div style="display: flex; flex-flow: row wrap; width: 100%; --cell-size: 2rem">
-                <cgt-konane>
-                    ___
-                    ___
-                    ___ox
-                    ___
-                    ___
-                </cgt-konane>
-                <cgt-konane>
-                    ___
-                    ___
-                    xo___
-                    ___
-                    ___
-                </cgt-konane>
-                <cgt-konane>
-                    __x_
-                    __o_
-                    _____
-                    ___
-                    ___
-                </cgt-konane>
-            </div>
-
-            No matter what, the board always ends up in the same state.
-            So, in some sense aren't all these games the same?
-            </p>
-            <p>
-                Absolutely. But, anything can be true when your playing with definitions.
-                For example: we can just focus on who wins, that's what we really care about.
-                Could we say all games that black wins are "the same"?
-            </p>
-            <p>
-                Definitely. We could also be strict about it - say that two boards have to be <i>exactly</i> the same to
-                be "the same".
-            </p>
-
-            <h2>Reconsidering Linear Patterns</h2>
-            <p>
-                Now, with that little bit of theory out of the way let's get back to our solid linear patterns.
-                Let's make a tree for N=7.
-            </p>
-            <div style="display: flex; flex-flow: row wrap; justify-content: space-between; padding: 0 20pt">
-                <div class="tree-grid" id="tree-slp-7-with-tree" style="--tree-node-size: 1cm;">
-                    <div class="node highlight" at="a1" data-value="-3">-3</div>
-                    <div class="link" at="a1" end="b2"></div>
-
-                    <div class="node" at="b2" data-value="-2">-2</div>
-                    <div class="link" at="b2" end="c3"></div>
-
-                    <div class="node" at="c3" data-value="-1">-1</div>
-                    <div class="link" at="c3" end="d4"></div>
-
-                    <div class="node" at="d4" data-value="0">0</div>
-                </div>
-                <cgt-konane id="ex-slp-7-with-tree" player="white" turn="white" style="--cell-size: 1em;">
-                    _
-                    x
-                    o
-                    x
-                    o
-                    x
-                    o
-                    x
-                    _
-                </cgt-konane>
-                <script>
-                    linkGameAndTree("#ex-slp-7-with-tree", "#tree-slp-7-with-tree");
-                    skipComputerTurnIfEmpty("#ex-slp-7-with-tree");
-                </script>
-            </div>
-
-            <p></p>
-
-            <div style="display: flex; flex-flow: row wrap; justify-content: space-between; padding: 0 20pt">
-                <div class="tree-grid" id="tree-slp-7-fork-with-tree" style="--tree-node-size: 1cm;">
-                    <div class="node highlight" at="a2" data-value="{ 0 | -2 }">{ 0 | -2 }</div>
-                    <div class="link" at="a2" end="b3"></div>
-
-                    <div class="node" at="b3" data-value="-2">-2</div>
-                    <div class="link" at="b3" end="c4"></div>
-
-                    <div class="node" at="b1" data-value="0">0</div>
-                    <div class="link" at="b1" end="a2"></div>
-
-                    <div class="node" at="c4" data-value="-1">-1</div>
-                    <div class="link" at="c4" end="d5"></div>
-
-                    <div class="node" at="d5" data-value="0">0</div>
-                </div>
-                <cgt-konane id="ex-slp-7-fork-with-tree" player="black" turn="black" style="--cell-size: 1em;">
-                    _
-                    xo_
-                    o_o
-                    x
-                    o
-                    x
-                    o
-                    x
-                    _
-                </cgt-konane>
-                <cgt-value for="#ex-slp-7-fork-with-tree"></cgt-value>
-                <script>
-                    linkGameAndTree("#ex-slp-7-fork-with-tree", "#tree-slp-7-fork-with-tree");
-                    // skipComputerTurnIfEmpty("#ex-slp-7-fork-with-tree");
-                </script>
-            </div>
-
-
-            <h2>Numbers</h2>
-            <p>We've been talking around the actual values for a while now.
-                How exactly do we rate the "goodness" of a particular configuration for one player?
-                <br>
-                Think of numbers a ratio of how many <i>potential</i> turns each player has in the game.
-                The sign indicates who will win.
-                For example: <i>-3</i> indicates that white can make three moves from this position, and black can make
-                none.
-
-            </p>
-            <figure class="example">
-                <figcaption>Meaning of -2</figcaption>
-                <div>
-                    <p>
-                        <i>-2</i> indicates that after <i>all</i> black's moves have been exhausted, white will still
-                        have 3.
-                        <br>
-                        This game has the value <cgt-value style="font-style:bold; font-size: inherit"
-                            for="#example-neg-3"></cgt-value>
-                    </p>
-                    <cgt-konane id="example-neg-3">
-                        ox__ox
-                        ox__ox
-                        ox__xo
-                    </cgt-konane>
-                </div>
-            </figure>
-            <figure class="example">
-                <figcaption>Meaning of -1/2</figcaption>
-                <div>
-                    <p>
-                        <i>-1/2</i> indicates that black has more moves from this particular position than white, but
-                        those moves are self destructive.
-                        <br>
-                        This game has the value <cgt-value style="font-style:bold; font-size: inherit"
-                            for="#example-neg-3div2"></cgt-value>
-                    </p>
-                    <cgt-konane id="example-neg-3div2">
-                        _xo_o
-                        __x_
-                    </cgt-konane>
-                </div>
-            </figure>
+        
         </section>
     </main>
 </body>
