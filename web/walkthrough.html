@@ -5,7 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <title>Konane</title>
+    <title>Kōnane</title>
 
     <script type="text/javascript" id="Testing Utilites">
         /* First we're going set up a few utilities for verifying our math is correct.
@@ -2526,7 +2526,7 @@
         }
     </script>
 
-    <style class="global">
+    <style id="core-styles">
         /* Inherited from Concrete CSS */
         :root {
             --fg: #111;
@@ -2546,7 +2546,7 @@
         }
 
         p {
-            text-wrap: pretty;
+            text-wrap: stable;
         }
 
         *,
@@ -2561,16 +2561,7 @@
             background: var(--bg);
             color: var(--fg);
             font-family: Helvetica, Arial, sans-serif;
-
-            /* main column takes up as much space as possible, up to 780px.
-             * Keeping the paragraph-style content to a smaller region gives us
-             * space for figures, and helps with readability (IMO, of course)
-            */
-            --main-column-width: min(100vw, 780px);
-
-
-            --main-column-margin-left: calc((100vw - var(--main-column-width)) / 2);
-            --main-column-margin-right: calc((100vw - var(--main-column-width)) / 2);
+            font-size: 1.2rem;
         }
 
         main section+section {
@@ -2581,12 +2572,22 @@
         body>main,
         body>footer {
             margin: auto;
-            width: var(--main-column-width);
-            margin-right: var(--main-column-margin-right);
-            margin-left: var(--main-column-margin-right);
+            padding: 0 12px;
+            max-width: 780px;
+        }
+        a {
+            text-decoration: none;
+            font-style: italic;
+            color: var(--fg);
         }
 
-        figure {
+        a:link {
+            color: var(--fg);
+        }
+    </style>
+
+    <style id="figure-styles"> 
+       figure {
             border: 1px solid var(--fg);
             padding: 12pt;
             display: flex;
@@ -2596,8 +2597,7 @@
         }
 
         main {
-            counter-reset: figure 0;
-            counter-reset: example 0;
+            counter-reset: example 0 figure 0;
         }
 
         figure:not(.example) {
@@ -2634,113 +2634,9 @@
             font-size: 0.8rem;
             width: fit-content;
         }
-
-        a {
-            text-decoration: none;
-            font-style: italic;
-            color: var(--fg);
-        }
-
-        a:link {
-            color: var(--fg);
-        }
     </style>
 
     <style>
-        /* Push children into the margin if there's space */
-        .spill-right {
-            width: calc(var(--main-column-margin-right) + var(--main-column-width));
-            padding: 0;
-            margin: 0;
-            display: flex;
-            flex-flow: row wrap;
-            justify-items: center;
-            align-items: center;
-        }
-
-
-        .spill-right>*:nth-child(2) {
-            max-width: var(--main-column-margin-right);
-            min-width: fit-content(var(--main-column-margin-right));
-            flex: 0 0 auto;
-        }
-
-        .spill-right>*:nth-child(1) {
-            max-width: var(--main-column-width);
-            min-width: fit-content(var(--main-column-width));
-            flex: 0 1 auto;
-        }
-
-        /* Push children into the left margin if there's space */
-        .spill-left {
-            width: calc(var(--main-column-margin-left) + var(--main-column-width));
-            padding: 0;
-            margin-left: calc(-1 * var(--main-column-margin-left));
-            display: flex;
-            flex-flow: row-reverse wrap;
-            justify-items: center;
-            align-items: center;
-        }
-
-        div.spill-left>*:nth-child(2) {
-            max-width: var(--main-column-margin-left);
-            min-width: fit-content(var(--main-column-margin-left));
-            flex: 0 1 auto;
-        }
-
-        div.spill-left>*:nth-child(1) {
-            max-width: var(--main-column-width);
-            min-width: fit-content(var(--main-column-width));
-            flex: 0 1 var(--main-column-width);
-        }
-
-
-        .side-by-side {
-            display: flex;
-            flex-flow: row wrap;
-            justify-content: center;
-            column-gap: 2em;
-            padding: 1em;
-        }
-
-        .side-by-side>* {
-            max-width: 400px;
-        }
-
-        .hint {
-            color: gray;
-            max-width: 200px;
-        }
-
-        #intro-game {
-            min-width: 300px;
-        }
-
-        cgt-value {
-            padding: .5rem;
-            font-size: 1.5rem;
-        }
-
-        cgt-konane.inline-left {
-            float: left;
-            padding-right: 1.5rem;
-        }
-
-        cgt-konane.inline-right {
-            float: right;
-            padding-left: 2rem
-        }
-
-        cgt-konane {
-            padding: 10pt;
-        }
-
-        figure cgt-konane {
-            display: inline-block;
-            --cell-size: 2rem;
-        }
-
-
         button {
             padding: .2rem .4rem;
             font-size: 1.2rem;
@@ -2777,8 +2673,6 @@
             grid-template-rows: 1fr;
             align-items: center;
             column-gap: 8pt;
-            padding-right: 2em;
-            padding-left: 2em;
         }
 
         .game-toolbar-row button {
@@ -2794,10 +2688,15 @@
             flex-flow: column;
             justify-content: center;
         }
+
+        hr.separater-h {
+            margin-top: 16pt;
+            margin-bottom: 12pt;
+        }
     </style>
 
 
-<style>
+<style id="Game Tree Styles">
     .tree-grid {
         display: inline-grid;
         grid-template-columns: repeat(auto-fill, var(--tree-node-size, 1cm));
@@ -2901,60 +2800,62 @@
         content: '';
         background-color: var(--fg);
     }
+
+    .scream {
+        text-transform: uppercase;
+    }
+</style>
+
+<style id="alignment-styles">
+    .center-h {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-flow: column nowrap;
+    }
+</style>
+
+
+<style id="varied-emphasis-styles">
+    .emph-low {
+        font-size: 0.8em;
+    }
 </style>
 </head>
 
 <body>
     <main>
         <section id="introduction">
-            <h1>Let's Play Konane</h1>
-            <p>You'll play as black in this game, so you get to go first!</p>
-            <div class="side-by-side">
+            <h1>Let's Play Kōnane</h1>
+
+            <p style="text-align: center">You'll play as black in this game, so you get to go first!</p>
+            <div class="center-h">
                 <div>
-                    <div class="hint">
-                        HINT: Try clicking or tapping on one of the black circles.
+                    <div class="flex-column-center" style="max-width: 300px">
+                        <div class="game-toolbar-row">
+                            <button class="undo" onclick="undo('#intro-game')"></button>
+                            <button class="reset" onclick="reset('#intro-game')"></button>
+                            <button class="redo" onclick="redo('#intro-game')"></button>
+                            <cgt-value for="#intro-game"></cgt-value>
+                        </div>
+                        <cgt-konane id="intro-game" controls="right">
+                            ____
+                            _xo_
+                            __xo_
+                            _____
+                        </cgt-konane>
                     </div>
-                    <br>
-                    <div style="font-weight: bold;max-width: 200px;" id="intro-game-winner"></div>
-
-
                 </div>
-                <div class="flex-column-center">
-                    <div class="game-toolbar-row">
-                        <button class="undo" onclick="undo('#intro-game')"></button>
-                        <button class="reset" onclick="reset('#intro-game')"></button>
-                        <button class="redo" onclick="redo('#intro-game')"></button>
-                        <cgt-value for="#intro-game"></cgt-value>
-                    </div>
-                    <cgt-konane id="intro-game" controls="right">
-                        ____
-                        _xo_
-                        __xo_
-                        _____
-                    </cgt-konane>
+                <div class="emph-low">
+                    <span class="scream">hint</span>: Try clicking or tapping on one of the black circles.
                 </div>
-
-                <script>
-                    document.getElementById("intro-game").addEventListener("game-complete", ev => {
-                        if (ev.detail.winner == "black") {
-                            document.getElementById("intro-game-winner").innerText = "Black won!"
-                        } else {
-                            document.getElementById("intro-game-winner").innerText = "White won 😔\ntry clicking the reset button."
-                        }
-                    });
-                    document.getElementById("intro-game").addEventListener("game-init", ev => {
-                        document.getElementById("intro-game-winner").innerText = "";
-                    });
-                </script>
             </div>
             <p>
-                Konane is a 2 player ancient Hawaiian game played on a rectangular grid.
+                &nbsp;&nbsp;&nbsp;&nbsp;Kōnane is a 2 player ancient Hawaiian game played on a rectangular grid.
                 One player uses black pieces, and the other white pieces.
                 To move a piece, a player must jump over one of their opponent's pieces.
                 The first player unable to make a move loses.
             </p>
-            <p style="text-align: center;">Try playing on the above board a bit to get a feel for the game.</p>
-            <div style="height: 12pt;"></div>
 
             <p>Any number of jumps can be made in a single direction.
                 For example, in this game you (black), can capture 1, 2, 3, or 4 white pieces.
@@ -2983,11 +2884,97 @@
 
         </section>
 
-        <hr style="width: 120%; margin-left: -10%; margin-top: 16pt; margin-bottom: 12pt;">
+        <hr class="separater-h">
+        
+        
+        <section id="game-trees">
+            <h2>Games All The Way Down</h2>
+
+            <p>
+                This page is a guide on how to take the fun out of Kōnane.
+                Luckily, Kōnane is an <i>intersting</i> game, it's not easy to ruin.
+                In fact, Kōnane is so interesting that we can't even do so using a computer.
+            </p>
+
+            <h3>Game Plan</h3>
+            <p>
+                How do we take the fun out of a game?
+                The idea's pretty simple:
+
+                <ol>
+                    <li>Determine who wins Kōnane positions with only a few pieces.</li>
+                    <li>Use those positions to determine who wins slightly more complex positions</li>
+                </ol>
+            </p>
+
+
+            <div class="spill-right">
+                <p>
+
+                    Okay, that doesn't help much - let's start from the bottom:
+                    <a href="ex-simple-p-class">Ex. 1</a> shows a game with a single piece.
+                    Say you go to take your turn on this game:
+                
+                    Whether you play black or white, you'd have no moves and promptly lose.
+                    Put another way: your opponent, the player who moved <i>previously</i>, would win.
+                </p>
+
+
+                <div>
+                    <figure id="ex-simple-p-class" class="example">
+                        <figcaption>A game with 1 piece</figcaption>
+                            <cgt-konane>
+                                ____
+                                _x__
+                                ____
+                        </cgt-konane>
+                    </figure>
+                </div>
+            </div>
+
+            <div class="spill-left">
+                <p>
+
+                    Okay, that doesn't help much - let's start from the bottom:
+                    <a href="ex-simple-n-class">Ex. 2</a> shows a game with a single piece.
+                    Say you go to take your turn on this game:
+                
+                    Whether you play black or white, you'd have no moves and promptly lose.
+                    Put another way: your opponent, the player who moved <i>previously</i>, would win.
+                </p>
+
+
+                <div>
+                    <figure id="ex-simple-n-class" class="example">
+                        <figcaption>A game with 2 pieces</figcaption>
+                            <cgt-konane style="--cell-size: 2rem">
+                                ____
+                                _xo_
+                                ____
+                        </cgt-konane>
+                    </figure>
+                </div>
+            </div>
+
+            <div>
+                <p>
+                    We'll sort positions into four <i>outcome classess</i>: 𝓟, 𝓝, 𝓛, 𝓡
+                    <a href="ex-simple-p-class">Ex. 1</a> 
+                    <ul>
+                        <li>If the <i>first</i> player to move loses, then the game is in outcome class 𝓟</li> 
+                        <li>If the <i>first</i> player to move wins, then the game is in outcome class 𝓝</li> 
+                        <li>If <i>white always wins</i>, then the game is in outcome class 𝓡</li> 
+                        <li>If <i>black always wins</i>, then the game is in outcome class 𝓛</li> 
+                    </ul>
+                </p>
+            </div>
+        </section>
+    
+        <hr class="separater-h">
 
         <section id="linear-games">
-            <h2>Numbers and Konane</h2>
-
+            <h2>Numbers and Kōnane</h2>
+                   
             <p>
                 That text under the board - "1", "*", maybe even "↓" - is the game's "value".
                 It's an abstract way to describe a two player game, basically a number to say how "good" the game is for
@@ -3156,14 +3143,15 @@
                         Whoever take the first turn in a zero game loses.
                     </p>
                 </div>
-                <figure class="example">
+                
+                <figure class="example" class="spill">
                     <figcaption>Zero Game</figcaption>
                     <cgt-konane id="example-zero-game">
                         o__
                         __x
                     </cgt-konane>
                 </figure>
-                </div>
+            </div>
                 
                 <div class="spill-left">
                     <div>
@@ -3286,8 +3274,8 @@
                 Now, with that little bit of theory out of the way let's get back to our solid linear patterns.
                 Let's make a tree for N=7.
             </p>
-            <div style="display: flex; flex-flow: row wrap;">
-                <div class="tree-grid" id="tree-slp-7-with-tree" style="padding: 10pt; --tree-node-size: .75cm;">
+            <div style="display: flex; flex-flow: row wrap; justify-content: space-between; padding: 0 20pt">
+                <div class="tree-grid" id="tree-slp-7-with-tree" style="--tree-node-size: 1cm;">
                     <div class="node highlight" at="a1" data-value="-3">-3</div>
                     <div class="link" at="a1" end="b2"></div>
 
@@ -3299,14 +3287,59 @@
 
                     <div class="node" at="d4" data-value="0">0</div>
                 </div>
-                <cgt-konane id="ex-slp-7-with-tree" player="white" turn="white" style="--cell-size: 2em;">
-                    _xoxoxox_
+                <cgt-konane id="ex-slp-7-with-tree" player="white" turn="white" style="--cell-size: 1em;">
+                    _
+                    x
+                    o
+                    x
+                    o
+                    x
+                    o
+                    x
+                    _
                 </cgt-konane>
+                <script>
+                    linkGameAndTree("#ex-slp-7-with-tree", "#tree-slp-7-with-tree");
+                    skipComputerTurnIfEmpty("#ex-slp-7-with-tree");
+                </script>
             </div>
-            <script>
-                linkGameAndTree("#ex-slp-7-with-tree", "#tree-slp-7-with-tree");
-                skipComputerTurnIfEmpty("#ex-slp-7-with-tree");
-            </script>
+
+            <p></p>
+
+            <div style="display: flex; flex-flow: row wrap; justify-content: space-between; padding: 0 20pt">
+                <div class="tree-grid" id="tree-slp-7-fork-with-tree" style="--tree-node-size: 1cm;">
+                    <div class="node highlight" at="a2" data-value="{ 0 | -2 }">{ 0 | -2 }</div>
+                    <div class="link" at="a2" end="b3"></div>
+
+                    <div class="node" at="b3" data-value="-2">-2</div>
+                    <div class="link" at="b3" end="c4"></div>
+
+                    <div class="node" at="b1" data-value="0">0</div>
+                    <div class="link" at="b1" end="a2"></div>
+
+                    <div class="node" at="c4" data-value="-1">-1</div>
+                    <div class="link" at="c4" end="d5"></div>
+
+                    <div class="node" at="d5" data-value="0">0</div>
+                </div>
+                <cgt-konane id="ex-slp-7-fork-with-tree" player="black" turn="black" style="--cell-size: 1em;">
+                    _
+                    xo_
+                    o_o
+                    x
+                    o
+                    x
+                    o
+                    x
+                    _
+                </cgt-konane>
+                <cgt-value for="#ex-slp-7-fork-with-tree"></cgt-value>
+                <script>
+                    linkGameAndTree("#ex-slp-7-fork-with-tree", "#tree-slp-7-fork-with-tree");
+                    // skipComputerTurnIfEmpty("#ex-slp-7-fork-with-tree");
+                </script>
+            </div>
+
 
             <h2>Numbers</h2>
             <p>We've been talking around the actual values for a while now.
