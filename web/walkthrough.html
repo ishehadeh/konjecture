@@ -1948,7 +1948,7 @@
             /** The color that can be controlled by interacting with the site
              * @type {["black"] | ["white"] | ["black", "white"] | []}
              */
-            get interactiveColors()  { return [...this.#interactiveColor] }
+            get interactiveColors() { return [...this.#interactiveColor] }
 
             #proposedMoves = [];
             #history = [];
@@ -2575,6 +2575,7 @@
             padding: 0 12px;
             max-width: 780px;
         }
+
         a {
             text-decoration: none;
             font-style: italic;
@@ -2586,8 +2587,8 @@
         }
     </style>
 
-    <style id="figure-styles"> 
-       figure {
+    <style id="figure-styles">
+        figure {
             border: 1px solid var(--fg);
             padding: 12pt;
             display: flex;
@@ -2696,131 +2697,234 @@
     </style>
 
 
-<style id="Game Tree Styles">
-    .tree-grid {
-        display: inline-grid;
-        grid-template-columns: repeat(auto-fill, var(--tree-node-size, 1cm));
-        grid-template-rows: repeat(auto-fill, var(--tree-node-size, 1cm));
-        row-gap: calc(var(--tree-node-size, 1cm) * 0.4);
-        column-gap: calc(var(--tree-node-size, 1cm) * 0.4);
-    }
+    <style id="Game Tree Styles">
+        .tree-grid {
+            display: inline-grid;
+            grid-template-columns: repeat(auto-fill, var(--tree-node-size, 1cm));
+            grid-template-rows: repeat(auto-fill, var(--tree-node-size, 1cm));
+            row-gap: calc(var(--tree-node-size, 1cm) * 0.4);
+            column-gap: calc(var(--tree-node-size, 1cm) * 0.4);
+        }
 
 
-    .tree-grid .node {
-        color: var(--bg);
-        border-radius: 50%;
-        display: flex;
-        font-size: min(8pt, calc(var(--tree-node-size, 1cm) * 0.5));
-        width: var(--tree-node-size, 1cm);
-        height: var(--tree-node-size, 1cm);
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        /* line-height: 1.2rem; */
-        aspect-ratio: 1 / 1;
-        grid-column-start: var(--x1, 1);
-        grid-row-start: var(--y1, 1);
-        background-color: var(--fg);
-    }
+        .tree-grid .node {
+            color: var(--bg);
+            border-radius: 50%;
+            display: flex;
+            font-size: min(8pt, calc(var(--tree-node-size, 1cm) * 0.5));
+            width: var(--tree-node-size, 1cm);
+            height: var(--tree-node-size, 1cm);
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            /* line-height: 1.2rem; */
+            aspect-ratio: 1 / 1;
+            grid-column-start: var(--x1, 1);
+            grid-row-start: var(--y1, 1);
+            background-color: var(--fg);
+        }
 
-    .tree-grid .node.highlight::before {
-        color: var(--fg);
-        position: absolute;
-        content: "▼";
-        transform: rotate(40deg) translateY(calc(-0.5 * (var(--tree-node-size, 1cm) + 12pt)));
-        transform-origin: bottom center;
-        text-align: center;
-        font-size: small;
-    }
+        .tree-grid .node.highlight::before {
+            color: var(--fg);
+            position: absolute;
+            content: "▼";
+            transform: rotate(40deg) translateY(calc(-0.5 * (var(--tree-node-size, 1cm) + 12pt)));
+            transform-origin: bottom center;
+            text-align: center;
+            font-size: small;
+        }
 
-    .tree-grid div[at^="a" i] { --y1: 1 }
-    .tree-grid div[at^="b" i] { --y1: 2 }
-    .tree-grid div[at^="c" i] { --y1: 3 }
-    .tree-grid div[at^="d" i] { --y1: 4 }
-    .tree-grid div[at^="e" i] { --y1: 5 }
-    .tree-grid div[at^="f" i] { --y1: 6 }
-    .tree-grid div[at^="g" i] { --y1: 7 }
-    .tree-grid div[at^="h" i] { --y1: 8 }
-    .tree-grid div[at^="i" i] { --y1: 9 }
-    .tree-grid div[at$="1" i] { --x1: 1 }
-    .tree-grid div[at$="2" i] { --x1: 2 }
-    .tree-grid div[at$="3" i] { --x1: 3 }
-    .tree-grid div[at$="4" i] { --x1: 4 }
-    .tree-grid div[at$="5" i] { --x1: 5 }
-    .tree-grid div[at$="6" i] { --x1: 6 }
-    .tree-grid div[at$="7" i] { --x1: 7 }
-    .tree-grid div[at$="8" i] { --x1: 8 }
-    .tree-grid div[at$="9" i] { --x1: 9 }
+        .tree-grid div[at^="a" i] {
+            --y1: 1
+        }
 
+        .tree-grid div[at^="b" i] {
+            --y1: 2
+        }
 
-    .tree-grid div[end^="a" i] { --y2: 1 }
-    .tree-grid div[end^="b" i] { --y2: 2 }
-    .tree-grid div[end^="c" i] { --y2: 3 }
-    .tree-grid div[end^="d" i] { --y2: 4 }
-    .tree-grid div[end^="e" i] { --y2: 5 }
-    .tree-grid div[end^="f" i] { --y2: 6 }
-    .tree-grid div[end^="g" i] { --y2: 7 }
-    .tree-grid div[end^="h" i] { --y2: 8 }
-    .tree-grid div[end$="1" i] { --x2: 1 }
-    .tree-grid div[end$="2" i] { --x2: 2 }
-    .tree-grid div[end$="3" i] { --x2: 3 }
-    .tree-grid div[end$="4" i] { --x2: 4 }
-    .tree-grid div[end$="5" i] { --x2: 5 }
-    .tree-grid div[end$="6" i] { --x2: 6 }
-    .tree-grid div[end$="7" i] { --x2: 7 }
-    .tree-grid div[end$="8" i] { --x2: 8 }
-    .tree-grid div[end$="9" i] { --x2: 9 }
+        .tree-grid div[at^="c" i] {
+            --y1: 3
+        }
 
-    .tree-grid .link {
-        grid-column-start: min(var(--x1), var(--x2));
-        grid-column-end: calc(max(var(--x1), var(--x2)) + 1);
-        grid-row-start: min(var(--y1), var(--y2));
-        grid-row-end: calc(max(var(--y1), var(--y2)) + 1);
-        background-color: var(--fg);
+        .tree-grid div[at^="d" i] {
+            --y1: 4
+        }
 
-        display: block;
-        background-color: transparent;
-        text-align: center;
-        font-size: 0.7rem;
-        z-index: -1;
-        transform: rotate(calc(45deg * (var(--y2) - var(--y1)) / (var(--x2) - var(--x1))));
-        display: grid;
-        grid-template-columns: 100%;
-        grid-template-rows: 1fr 4px 1fr;
-        justify-content: center;
-        align-items: center;
-        color: var(--fg);
-    }
+        .tree-grid div[at^="e" i] {
+            --y1: 5
+        }
 
-    .tree-grid .link::before {
-        grid-row: 2;
-        width: 100%;
-        height: 100%;
-        display: block;
-        content: '';
-        background-color: var(--fg);
-    }
+        .tree-grid div[at^="f" i] {
+            --y1: 6
+        }
 
-    .scream {
-        text-transform: uppercase;
-    }
-</style>
+        .tree-grid div[at^="g" i] {
+            --y1: 7
+        }
 
-<style id="alignment-styles">
-    .center-h {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        flex-flow: column nowrap;
-    }
-</style>
+        .tree-grid div[at^="h" i] {
+            --y1: 8
+        }
+
+        .tree-grid div[at^="i" i] {
+            --y1: 9
+        }
+
+        .tree-grid div[at$="1" i] {
+            --x1: 1
+        }
+
+        .tree-grid div[at$="2" i] {
+            --x1: 2
+        }
+
+        .tree-grid div[at$="3" i] {
+            --x1: 3
+        }
+
+        .tree-grid div[at$="4" i] {
+            --x1: 4
+        }
+
+        .tree-grid div[at$="5" i] {
+            --x1: 5
+        }
+
+        .tree-grid div[at$="6" i] {
+            --x1: 6
+        }
+
+        .tree-grid div[at$="7" i] {
+            --x1: 7
+        }
+
+        .tree-grid div[at$="8" i] {
+            --x1: 8
+        }
+
+        .tree-grid div[at$="9" i] {
+            --x1: 9
+        }
 
 
-<style id="varied-emphasis-styles">
-    .emph-low {
-        font-size: 0.8em;
-    }
-</style>
+        .tree-grid div[end^="a" i] {
+            --y2: 1
+        }
+
+        .tree-grid div[end^="b" i] {
+            --y2: 2
+        }
+
+        .tree-grid div[end^="c" i] {
+            --y2: 3
+        }
+
+        .tree-grid div[end^="d" i] {
+            --y2: 4
+        }
+
+        .tree-grid div[end^="e" i] {
+            --y2: 5
+        }
+
+        .tree-grid div[end^="f" i] {
+            --y2: 6
+        }
+
+        .tree-grid div[end^="g" i] {
+            --y2: 7
+        }
+
+        .tree-grid div[end^="h" i] {
+            --y2: 8
+        }
+
+        .tree-grid div[end$="1" i] {
+            --x2: 1
+        }
+
+        .tree-grid div[end$="2" i] {
+            --x2: 2
+        }
+
+        .tree-grid div[end$="3" i] {
+            --x2: 3
+        }
+
+        .tree-grid div[end$="4" i] {
+            --x2: 4
+        }
+
+        .tree-grid div[end$="5" i] {
+            --x2: 5
+        }
+
+        .tree-grid div[end$="6" i] {
+            --x2: 6
+        }
+
+        .tree-grid div[end$="7" i] {
+            --x2: 7
+        }
+
+        .tree-grid div[end$="8" i] {
+            --x2: 8
+        }
+
+        .tree-grid div[end$="9" i] {
+            --x2: 9
+        }
+
+        .tree-grid .link {
+            grid-column-start: min(var(--x1), var(--x2));
+            grid-column-end: calc(max(var(--x1), var(--x2)) + 1);
+            grid-row-start: min(var(--y1), var(--y2));
+            grid-row-end: calc(max(var(--y1), var(--y2)) + 1);
+            background-color: var(--fg);
+
+            display: block;
+            background-color: transparent;
+            text-align: center;
+            font-size: 0.7rem;
+            z-index: -1;
+            transform: rotate(calc(45deg * (var(--y2) - var(--y1)) / (var(--x2) - var(--x1))));
+            display: grid;
+            grid-template-columns: 100%;
+            grid-template-rows: 1fr 4px 1fr;
+            justify-content: center;
+            align-items: center;
+            color: var(--fg);
+        }
+
+        .tree-grid .link::before {
+            grid-row: 2;
+            width: 100%;
+            height: 100%;
+            display: block;
+            content: '';
+            background-color: var(--fg);
+        }
+
+        .scream {
+            text-transform: uppercase;
+        }
+    </style>
+
+    <style id="alignment-styles">
+        .center-h {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-flow: column nowrap;
+        }
+    </style>
+
+
+    <style id="varied-emphasis-styles">
+        .emph-low {
+            font-size: 0.8em;
+        }
+    </style>
 </head>
 
 <body>
@@ -2885,8 +2989,8 @@
         </section>
 
         <hr class="separater-h">
-        
-        
+
+
         <section id="game-trees">
             <h2>Games All The Way Down</h2>
 
@@ -2901,10 +3005,10 @@
                 How do we take the fun out of a game?
                 The idea's pretty simple:
 
-                <ol>
-                    <li>Determine who wins Kōnane positions with only a few pieces.</li>
-                    <li>Use those positions to determine who wins slightly more complex positions</li>
-                </ol>
+            <ol>
+                <li>Determine who wins Kōnane positions with only a few pieces.</li>
+                <li>Use those positions to determine who wins slightly more complex positions</li>
+            </ol>
             </p>
 
 
@@ -2914,7 +3018,7 @@
                     Okay, that doesn't help much - let's start from the bottom:
                     <a href="ex-simple-p-class">Ex. 1</a> shows a game with a single piece.
                     Say you go to take your turn on this game:
-                
+
                     Whether you play black or white, you'd have no moves and promptly lose.
                     Put another way: your opponent, the player who moved <i>previously</i>, would win.
                 </p>
@@ -2923,10 +3027,10 @@
                 <div>
                     <figure id="ex-simple-p-class" class="example">
                         <figcaption>A game with 1 piece</figcaption>
-                            <cgt-konane>
-                                ____
-                                _x__
-                                ____
+                        <cgt-konane>
+                            ____
+                            _x__
+                            ____
                         </cgt-konane>
                     </figure>
                 </div>
@@ -2938,7 +3042,7 @@
                     Okay, that doesn't help much - let's start from the bottom:
                     <a href="ex-simple-n-class">Ex. 2</a> shows a game with a single piece.
                     Say you go to take your turn on this game:
-                
+
                     Whether you play black or white, you'd have no moves and promptly lose.
                     Put another way: your opponent, the player who moved <i>previously</i>, would win.
                 </p>
@@ -2947,10 +3051,10 @@
                 <div>
                     <figure id="ex-simple-n-class" class="example">
                         <figcaption>A game with 2 pieces</figcaption>
-                            <cgt-konane style="--cell-size: 2rem">
-                                ____
-                                _xo_
-                                ____
+                        <cgt-konane style="--cell-size: 2rem">
+                            ____
+                            _xo_
+                            ____
                         </cgt-konane>
                     </figure>
                 </div>
@@ -2959,22 +3063,22 @@
             <div>
                 <p>
                     We'll sort positions into four <i>outcome classess</i>: 𝓟, 𝓝, 𝓛, 𝓡
-                    <a href="ex-simple-p-class">Ex. 1</a> 
-                    <ul>
-                        <li>If the <i>first</i> player to move loses, then the game is in outcome class 𝓟</li> 
-                        <li>If the <i>first</i> player to move wins, then the game is in outcome class 𝓝</li> 
-                        <li>If <i>white always wins</i>, then the game is in outcome class 𝓡</li> 
-                        <li>If <i>black always wins</i>, then the game is in outcome class 𝓛</li> 
-                    </ul>
+                    <a href="ex-simple-p-class">Ex. 1</a>
+                <ul>
+                    <li>If the <i>first</i> player to move loses, then the game is in outcome class 𝓟</li>
+                    <li>If the <i>first</i> player to move wins, then the game is in outcome class 𝓝</li>
+                    <li>If <i>white always wins</i>, then the game is in outcome class 𝓡</li>
+                    <li>If <i>black always wins</i>, then the game is in outcome class 𝓛</li>
+                </ul>
                 </p>
             </div>
         </section>
-    
+
         <hr class="separater-h">
 
         <section id="linear-games">
             <h2>Numbers and Kōnane</h2>
-                   
+
             <p>
                 That text under the board - "1", "*", maybe even "↓" - is the game's "value".
                 It's an abstract way to describe a two player game, basically a number to say how "good" the game is for
@@ -3099,14 +3203,14 @@
                 function skipComputerTurnIfEmpty(selector) {
                     const elem = document.querySelector(selector);
                     elem.addEventListener("game-update", (ev) => {
-                            if (elem.interactiveColors.includes(ev.detail.player)) {
-                                return;
-                            }
+                        if (elem.interactiveColors.includes(ev.detail.player)) {
+                            return;
+                        }
 
-                            const hasMoves = !ev.target.game.moves(ev.detail.player).allMoves().next().done;
-                            if (!hasMoves) {
-                                ev.target.createNewState(ev.detail.player == "black" ? "white" : "black");
-                            }
+                        const hasMoves = !ev.target.game.moves(ev.detail.player).allMoves().next().done;
+                        if (!hasMoves) {
+                            ev.target.createNewState(ev.detail.player == "black" ? "white" : "black");
+                        }
                     })
                 }
                 document
@@ -3143,7 +3247,7 @@
                         Whoever take the first turn in a zero game loses.
                     </p>
                 </div>
-                
+
                 <figure class="example" class="spill">
                     <figcaption>Zero Game</figcaption>
                     <cgt-konane id="example-zero-game">
@@ -3152,60 +3256,63 @@
                     </cgt-konane>
                 </figure>
             </div>
-                
-                <div class="spill-left">
-                    <div>
-                        <h3>Negative Whole Numbers</h3>
-                        <p>
-                            Now, bear with me and consider a contrived example
-                            (<a href="#ex-only-white-can-move">Ex. 2</a>).
-                            Black has no options, and white has a single option.
-                            White's only option moves the game to zero.
-                            We'll call this game "-1".
-                        </p>
-                
-                        <p>
-                            To understand why this game is "-1", let's take a step back and look at a game of Konane in the abstract.
-                            A game of Konane is can be thought of as a family tree.
-                            A "person" in that tree is a particular state of the Konane board.
-                            An line between two states represents a valid move from the parent state to the child state.
-                        </p>
-                
-                        <p>
-                        <div class="tree-grid" id="tree-only-white-can-move" style="padding: 10pt; width: 3cm; float: right;">
-                            <div class="node highlight" at="a1" data-value="-1">
-                                -1
-                            </div>
-                            <div class="link" at="a1" end="b2">
-                                W
-                            </div>
-                            <div class="node" at="b2" id="node-0" data-value="0">
-                                0
-                            </div>
+
+            <div class="spill-left">
+                <div>
+                    <h3>Negative Whole Numbers</h3>
+                    <p>
+                        Now, bear with me and consider a contrived example
+                        (<a href="#ex-only-white-can-move">Ex. 2</a>).
+                        Black has no options, and white has a single option.
+                        White's only option moves the game to zero.
+                        We'll call this game "-1".
+                    </p>
+
+                    <p>
+                        To understand why this game is "-1", let's take a step back and look at a game of Konane in the
+                        abstract.
+                        A game of Konane is can be thought of as a family tree.
+                        A "person" in that tree is a particular state of the Konane board.
+                        An line between two states represents a valid move from the parent state to the child state.
+                    </p>
+
+                    <p>
+                    <div class="tree-grid" id="tree-only-white-can-move"
+                        style="padding: 10pt; width: 3cm; float: right;">
+                        <div class="node highlight" at="a1" data-value="-1">
+                            -1
                         </div>
-                        This tree represents the game from <a href="#ex-only-white-can-move">Ex. 2</a>.
-                        The leaf node on the tree is "0", representing the state
-                        <cgt-konane
-                            style="display: inline-block; padding: 0 3pt; --cell-size: 1rem; white-space: nowrap;">__o</cgt-konane>
-                        There's a single edge attached to that node, linking it to "-1".
-                        Notice there's no edge marked "B", since black has no possible moves.
-                        </p>
-                
-                
-                
+                        <div class="link" at="a1" end="b2">
+                            W
+                        </div>
+                        <div class="node" at="b2" id="node-0" data-value="0">
+                            0
+                        </div>
                     </div>
-                    <figure class="example" id="ex-only-white-can-move">
-                        <figcaption>Only White Can Move</figcaption>
-                
-                        <cgt-konane player="white" turn="white" style="--cell-size: 2em;">
-                            ox_
-                            ___
-                        </cgt-konane>
-                    </figure>
+                    This tree represents the game from <a href="#ex-only-white-can-move">Ex. 2</a>.
+                    The leaf node on the tree is "0", representing the state
+                    <cgt-konane
+                        style="display: inline-block; padding: 0 3pt; --cell-size: 1rem; white-space: nowrap;">__o</cgt-konane>
+                    There's a single edge attached to that node, linking it to "-1".
+                    Notice there's no edge marked "B", since black has no possible moves.
+                    </p>
+
+
+
+                </div>
+                <figure class="example" id="ex-only-white-can-move">
+                    <figcaption>Only White Can Move</figcaption>
+
+                    <cgt-konane player="white" turn="white" style="--cell-size: 2em;">
+                        ox_
+                        ___
+                    </cgt-konane>
+                </figure>
             </div>
 
             <p>
-                Try moving in <a href="#ex-only-white-can-move">Ex. 2</a>, the node corrosponding to the current state will be
+                Try moving in <a href="#ex-only-white-can-move">Ex. 2</a>, the node corrosponding to the current state
+                will be
                 highlighted.
             </p>
 
@@ -3230,35 +3337,37 @@
 
             <h2>Games All the Way Down</h2>
             <p>
-                Like in the above example with -1, in order to fully analyze any Konane position we need to understand the options of each player.
-                Actually, that's all we care about: what board states can black move to, and what board states can white move to.
+                Like in the above example with -1, in order to fully analyze any Konane position we need to understand
+                the options of each player.
+                Actually, that's all we care about: what board states can black move to, and what board states can white
+                move to.
                 Take games below as an example:
-                <div style="display: flex; flex-flow: row wrap; width: 100%; --cell-size: 2rem">
-                    <cgt-konane>
-                        ___
-                        ___
-                        ___ox
-                        ___
-                        ___
-                    </cgt-konane>
-                    <cgt-konane>
-                        ___
-                        ___
-                        xo___
-                        ___
-                        ___
-                    </cgt-konane>
-                    <cgt-konane>
-                        __x_
-                        __o_
-                        _____
-                        ___
-                        ___
-                    </cgt-konane>
-                </div>
+            <div style="display: flex; flex-flow: row wrap; width: 100%; --cell-size: 2rem">
+                <cgt-konane>
+                    ___
+                    ___
+                    ___ox
+                    ___
+                    ___
+                </cgt-konane>
+                <cgt-konane>
+                    ___
+                    ___
+                    xo___
+                    ___
+                    ___
+                </cgt-konane>
+                <cgt-konane>
+                    __x_
+                    __o_
+                    _____
+                    ___
+                    ___
+                </cgt-konane>
+            </div>
 
-                No matter what, the board always ends up in the same state.
-                So, in some sense aren't all these games the same?
+            No matter what, the board always ends up in the same state.
+            So, in some sense aren't all these games the same?
             </p>
             <p>
                 Absolutely. But, anything can be true when your playing with definitions.
@@ -3266,9 +3375,10 @@
                 Could we say all games that black wins are "the same"?
             </p>
             <p>
-                Definitely. We could also be strict about it - say that two boards have to be <i>exactly</i> the same to be "the same".
+                Definitely. We could also be strict about it - say that two boards have to be <i>exactly</i> the same to
+                be "the same".
             </p>
-            
+
             <h2>Reconsidering Linear Patterns</h2>
             <p>
                 Now, with that little bit of theory out of the way let's get back to our solid linear patterns.
