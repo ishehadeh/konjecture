@@ -2911,14 +2911,38 @@
     </style>
 
     <style id="alignment-styles">
-        .center-h {
+        /* Center align the content of elements with this class, horizontal.
+         *
+         */
+        .center.horizontal:not(.stack) {
             display: flex;
-            justify-content: center;
             align-items: center;
             flex-flow: column nowrap;
         }
+
+        /* Put as many child elements in a horizontal row as possible */
+        .stack.horizontal {
+            display: flex;
+            flex-flow: row wrap;
+        }
+
+        .stack.horizontal.center {
+            align-items: center;
+        }
     </style>
 
+
+    <style id="Main Content Sizing">
+        /* by default, use roughly 2x character-sized Konane cells */
+        cgt-konane {
+            --cell-size: 2em;
+        }
+
+        /* Longer lines are generally easier to read, IMO, so force paragraphs to be at least 400px (up to divide width) */
+        p {
+            min-width: min(400px, 100%);
+        }
+    </style>
 
     <style id="varied-emphasis-styles">
         .emph-low {
@@ -2930,29 +2954,19 @@
 <body>
     <main>
         <section id="introduction">
-            <h1>Let's Play Kōnane</h1>
+            <h1>Let's Play Kōnane&hellip;</h1>
 
-            <p style="text-align: center">You'll play as black in this game, so you get to go first!</p>
-            <div class="center-h">
-                <div>
-                    <div class="flex-column-center" style="max-width: 300px">
-                        <div class="game-toolbar-row">
-                            <button class="undo" onclick="undo('#intro-game')"></button>
-                            <button class="reset" onclick="reset('#intro-game')"></button>
-                            <button class="redo" onclick="redo('#intro-game')"></button>
-                            <cgt-value for="#intro-game"></cgt-value>
-                        </div>
-                        <cgt-konane id="intro-game" controls="right">
-                            ____
-                            _xo_
-                            __xo_
-                            _____
-                        </cgt-konane>
-                    </div>
-                </div>
-                <div class="emph-low">
-                    <span class="scream">hint</span>: Try clicking or tapping on one of the black circles.
-                </div>
+            <div class="horizontal stack">
+                <cgt-konane id="intro-game" controls="right">
+                    ____
+                    _xo_
+                    __xo_
+                    _____
+                </cgt-konane>
+
+                <p>
+                    This is Konane, an ancient Hawaiian game, somewhat similar to checkers.
+                </p>
             </div>
             <p>
                 &nbsp;&nbsp;&nbsp;&nbsp;Kōnane is a 2 player ancient Hawaiian game played on a rectangular grid.
