@@ -30,6 +30,8 @@ jobs:
     - name: Commit update in GitHub pages repo
       run: |
         cd ./ishehadeh.github.io
+        git config user.name github-actions
+        git config user.email github-actions@github.com
         git add www/konane.html
         git commit -m 'update konane'
         git push
