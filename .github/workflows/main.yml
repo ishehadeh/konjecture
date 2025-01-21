@@ -26,14 +26,14 @@ jobs:
         repository: ishehadeh/ishehadeh.github.io
         path: ./ishehadeh.github.io
         ref: 'master'
-        token:  ${{ secrets.PAGES_REPO_PAT }}
+        token: ${{ secrets.PAGES_REPO_PAT }}
     - name: Copy walkthrough.html to www/konane.html
       run: cp web/walkthrough.html ./ishehadeh.github.io/www/konane.html
     
     - name: Configure Git
       run: |
-        git config user.name github-actions
-        git config user.email github-actions@github.com
+        git config --global user.name github-actions
+        git config --global user.email github-actions@github.com
 
     - name: Commit update in GitHub pages repo
       run: |
