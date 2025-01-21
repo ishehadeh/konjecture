@@ -6,7 +6,7 @@ on:
     branches: 
       - main
     paths:
-      - 'web/konane.html'
+      - 'web/walkthrough.html'
   workflow_dispatch:
 
 jobs:
