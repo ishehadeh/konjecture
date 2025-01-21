@@ -9,6 +9,9 @@ on:
       - 'web/walkthrough.html'
   workflow_dispatch:
 
+permissions:
+  id-token: write
+
 jobs:
   copy_web_to_gh_pages: 
     runs-on: ubuntu-latest
