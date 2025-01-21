@@ -1,6 +1,4 @@
-ub/workflows/copy-openapi-file.yml
-
-name: Copy updated OpenAPI file
+name: Deploy web/konane.html
 
 # only run this workflow when the openapi file has changed on the master branch
 on: 
@@ -8,7 +6,7 @@ on:
     branches: 
       - main
     paths:
-      - 'notehub/api/openapi.yaml'
+      - 'web/konane.html'
   workflow_dispatch:
 
 jobs:
