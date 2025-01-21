@@ -1,4 +1,4 @@
-name: Deploy web/konane.html
+name: Deploy web/walkthrough.html
 
 # only run this workflow when the openapi file has changed on the master branch
 on: 
@@ -21,9 +21,9 @@ jobs:
         repository: ishehadeh/ishehadeh.github.io
         path: ./ishehadeh.github.io
         ref: 'master'
-        token:  ${{ secrets.ACTIONS_GITHUB_TOKEN }}
+        token:  ${{ secrets.GITHUB_TOKEN }}
     - name: Copy walkthrough.html to www/konane.html
-      run: cp ./web/walkthrough.html ./ishehadeh.github.io/www/konane.html
+      run: cp web/walkthrough.html ./ishehadeh.github.io/www/konane.html
     - name: Commit update in GitHub pages repo
       run: bash ./.github/scripts/push-gh-pages.sh
       env:
