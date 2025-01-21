@@ -28,6 +28,10 @@ jobs:
     - name: Copy walkthrough.html to www/konane.html
       run: cp web/walkthrough.html ./ishehadeh.github.io/www/konane.html
     - name: Commit update in GitHub pages repo
-      run: bash ./.github/scripts/push-gh-pages.sh
+      run: |
+        cd ./ishehadeh.github.io
+        git add www/konane.html
+        git commit -m 'update konane'
+        git push
       env:
         BRANCH: master
