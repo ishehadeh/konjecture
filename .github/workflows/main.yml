@@ -9,13 +9,13 @@ on:
       - 'web/walkthrough.html'
   workflow_dispatch:
 
-permissions:
-  id-token: write
-  contents: write
-  pages: write
 
 jobs:
   copy_web_to_gh_pages: 
+    permissions:
+      id-token: write
+      contents: write
+      pages: write
     runs-on: ubuntu-latest
     steps:
     - name: Check out GitHub konjecture repo
