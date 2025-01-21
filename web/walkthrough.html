@@ -107,6 +107,7 @@
          * @param {RegExp | string | undefined} pattern
          */
         function runTests(pattern = undefined) {
+            console.log("running tests...")
             const failures = _gTestSet.run(pattern);
             console.log("Test Results");
             for (const [name, result] of failures.entries()) {
@@ -228,6 +229,27 @@
             bit /= 2n;
             return bit;
         }
+
+        /** Count the number of bytes required to store integer `n`
+         * 
+         * @param {bigint} n
+         * @returns {number}
+         */
+        function minimumBytesRequiredToRepresentBigInt(n) {
+            return Math.ceil(n.toString(2).length / 8);
+        }
+
+        test("minimumBytesRequiredToRepresentBigInt returns correct count for 1 to 8 byte integers", (t) => {
+            t.assertEq(minimumBytesRequiredToRepresentBigInt(0xffn), 1);
+            t.assertEq(minimumBytesRequiredToRepresentBigInt(-0xffn), 2);
+            t.assertEq(minimumBytesRequiredToRepresentBigInt(-0x0fn), 1);
+            t.assertEq(minimumBytesRequiredToRepresentBigInt(0xfffn), 2);
+            t.assertEq(minimumBytesRequiredToRepresentBigInt(0x0n), 1);
+            t.assertEq(minimumBytesRequiredToRepresentBigInt(0xff0fn), 2);
+            t.assertEq(minimumBytesRequiredToRepresentBigInt(0xff0fff0fn), 4);
+            t.assertEq(minimumBytesRequiredToRepresentBigInt(0xff0fff0fff0fff0fn), 8);
+            t.assertEq(minimumBytesRequiredToRepresentBigInt(-0xff0fff0fff0fff0fn), 9);
+        });
     </script>
 
 
@@ -674,6 +696,105 @@
                 }
             }
 
+            /** 
+             * @param {DataView} buffer buffer where this object is written
+             * @returns {bigint} number of bytes written
+             */
+             serialize(buffer) {
+                // byte 1 layout:
+                // |---------|---------|---------|---------|
+                //  numerator   denom    up        star
+
+                // each two byte field has the following meaning:
+                //  0b00 - component is missing
+                //  0b01 - component has 1 bytes
+                //  0b10 - component has 2 bytes
+                //  0b11 - component has 8 bytes
+
+                let byteOffset = 1;
+                let infoByte = 0;
+                const writeNum = (fieldOffset, value) => {
+                    if (value === 0n) {
+                        return
+                    } else {
+                        const bytes = minimumBytesRequiredToRepresentBigInt(value);
+                        console.assert(bytes <= 8);
+                        if (bytes == 1) {
+                            if (fieldOffset % 4 === 0) {
+                                buffer.setInt8(byteOffset, Number(value));
+                            } else {
+                                buffer.setUint8(byteOffset, Number(value));
+                            }
+                            byteOffset += 1;
+                            infoByte |= (0b01_00_00_00 >> fieldOffset);
+                        } else if (bytes == 2) {
+                            if (fieldOffset % 4 === 0) {
+                                buffer.setInt16(byteOffset, Number(value));
+                            } else {
+                                buffer.setUint16(byteOffset, Number(value));
+                            }
+                            byteOffset += 2;
+                            infoByte |= (0b10_00_00_00 >> fieldOffset);
+                        } else {
+                            if (fieldOffset % 4 === 0) {
+                                buffer.setBigInt64(byteOffset, Number(value));
+                            } else {
+                                buffer.setBigUint64(byteOffset, Number(value));
+                            }
+                            byteOffset += 8;
+                            infoByte |= (0b11_00_00_00 >> fieldOffset);
+                        }
+                    }
+                }
+                
+                writeNum(0, this.#number.numerator);
+                writeNum(2, this.#number.denominatorExp);
+                writeNum(4, this.up);
+                writeNum(6, this.star);
+                buffer.setUint8(0, infoByte);
+                return byteOffset;   
+            }
+
+
+            /** 
+             * @param {DataView} buffer buffer where this object is read
+             * @returns {[number, NumberUpStar]} bytes read and result
+             */
+            static deserialize(buffer) {
+                const infoByte = buffer.getUint8(0);
+                let byteOffset = 1;
+                const readComponent = (fieldOffset) => {
+                    const encodedLen = (infoByte >> (6 - fieldOffset)) & 0b00_00_00_11;
+                    switch (encodedLen) {
+                        case 0: return 0n;
+                        case 1: {
+                            const val = (fieldOffset % 4 == 0) ? buffer.getInt8(byteOffset) : buffer.getUint8(byteOffset);
+                            byteOffset += 1;
+                            return BigInt(val);
+                        }
+                        case 2: {
+                            const val = (fieldOffset % 4 == 0) ? buffer.getInt16(byteOffset) : buffer.getUint16(byteOffset);
+                            byteOffset += 2;
+                            return BigInt(val);
+                        }
+                        case 3: {
+                            const val = (fieldOffset % 4 == 0) ? buffer.getBigInt64(byteOffset) : buffer.getBigInt64(byteOffset);
+                            byteOffset += 8;
+                            return BigInt(val);
+                        }
+                        default: {
+                            throw new Error(`invalid encoded length: ${encodedLen}`);
+                        }
+                    }
+                }
+
+                const numer = readComponent(0);
+                const denom = readComponent(2);
+                const up = readComponent(4);
+                const star = readComponent(6);
+                return [byteOffset, new NumberUpStar(new DyadicRational(numer, denom), up, star)];
+            }
+
             /** Try to coerce an arbirary value into a NumberUpStar
              * 
              * @param {any} value
@@ -852,6 +973,25 @@
             }
         }
 
+        test("NumberUpStar serialize/deserialize roundtrip", (t) => {
+            const serDe = (obj) => {
+                const data = new DataView(new ArrayBuffer(64));
+                obj.serialize(data);
+                const [_, deserObj] = NumberUpStar.deserialize(data);
+                return deserObj;
+            }
+
+            let zero = new NumberUpStar(0, 0, 0);
+            let star = new NumberUpStar(0, 0, 1);
+            let nus = new NumberUpStar(new DyadicRational(11, 3), 2, 1);
+            let up = new NumberUpStar(0, 1, 0);
+
+            t.assertEq(serDe(star), star);
+            t.assertEq(serDe(zero), zero);
+            t.assertEq(serDe(nus), nus);
+            t.assertEq(serDe(up), up);
+        })
+
         test("NumberUpStar comparison 0 || *", (t) => {
             let zero = new NumberUpStar(0, 0, 0);
             let star = new NumberUpStar(0, 0, 1);
@@ -892,6 +1032,76 @@
 
                 this.left = left;
                 this.right = right;
+            }
+
+            
+            /** 
+             * @param {DataView} buffer buffer where this object is written
+             * @returns {bigint} number of bytes written
+             */
+            serialize(buffer) {
+                const leftNusMoves = this.left.filter(m => m instanceof NumberUpStar);
+                const leftOptions = this.left.filter(m => m instanceof MoveSet);
+                console.assert(leftNusMoves.length + leftOptions.length === this.left.length);
+
+
+                const rightNusMoves = this.right.filter(m => m instanceof NumberUpStar);
+                const rightOptions = this.right.filter(m => m instanceof MoveSet);
+                console.assert(leftNusMoves.length + leftOptions.length === this.left.length);
+                buffer.setUint16(0, leftNusMoves.length);
+                buffer.setUint16(2, rightNusMoves.length);
+                buffer.setUint16(4, leftOptions.length);
+                buffer.setUint16(6, rightOptions.length);
+                let byteOffset = 8;
+                for(const move of leftNusMoves) {
+                    byteOffset += move.serialize(new DataView(buffer.buffer, byteOffset + buffer.byteOffset));
+                    console.log(buffer.buffer)
+                }
+                for(const move of rightNusMoves) {
+                    byteOffset += move.serialize(new DataView(buffer.buffer, byteOffset + buffer.byteOffset));
+                }
+                for(const move of leftOptions) {
+                    byteOffset += move.serialize(new DataView(buffer.buffer, byteOffset + buffer.byteOffset));
+                }
+                for(const move of rightOptions) {
+                    byteOffset += move.serialize(new DataView(buffer.buffer, byteOffset + buffer.byteOffset));
+                }
+                return byteOffset;
+            }
+
+            /** 
+             * @param {DataView} buffer buffer where this object is read
+             * @returns {[number, NumberUpStar]} bytes read and result
+             */
+            static deserialize(buffer) {
+                const leftNusMovesCount = buffer.getUint16(0);
+                const rightNusMovesCount = buffer.getUint16(2);
+                const leftOptions = buffer.getUint16(4);
+                const rightOptions = buffer.getUint16(6);
+                let byteOffset = 8;
+                const left = [];
+                const right = [];
+                for(let i = 0; i < leftNusMovesCount; ++i) {
+                    let [moveByteLen, move] = NumberUpStar.deserialize(new DataView(buffer.buffer, byteOffset + buffer.byteOffset));
+                    byteOffset += moveByteLen;
+                    left.push(move)
+                }
+                for(let i = 0; i < rightNusMovesCount; ++i) {
+                    let [moveByteLen, move] = NumberUpStar.deserialize(new DataView(buffer.buffer, byteOffset + buffer.byteOffset));
+                    byteOffset += moveByteLen;
+                    right.push(move)
+                }
+                for(let i = 0; i < leftOptions; ++i) {
+                    let [moveByteLen, move] = MoveSet.deserialize(new DataView(buffer.buffer, byteOffset + buffer.byteOffset));
+                    byteOffset += moveByteLen;
+                    left.push(move)
+                }
+                for(let i = 0; i < rightOptions; ++i) {
+                    let [moveByteLen, move] = MoveSet.deserialize(new DataView(buffer.buffer, byteOffset + buffer.byteOffset));
+                    byteOffset += moveByteLen;
+                    right.push(move)
+                }
+                return [byteOffset, new MoveSet(left, right)];
             }
 
             clone() {
@@ -1259,6 +1469,17 @@
                 }
             }
         }
+
+        test("MoveSet serialize/deserialize round trip", (t) => {
+            let mv = new MoveSet([new NumberUpStar(2)], [new NumberUpStar(1)]);
+            const serDe = (obj) => {
+                const data = new DataView(new ArrayBuffer(64));
+                obj.serialize(data);
+                const [_, deserObj] = MoveSet.deserialize(data);
+                return deserObj;
+            }
+            t.assertEq(serDe(mv), mv)
+        })
 
         function canonicalForm(left, right) {
             const canonLeft = [];
@@ -2526,7 +2747,7 @@
         }
     </script>
 
-    <style id="core-styles">
+    <style id="Core Styles">
         /* Inherited from Concrete CSS */
         :root {
             --fg: #111;
@@ -2663,6 +2884,16 @@
             display: inline-block;
         }
 
+        aside {
+            font-size: 0.8em;
+            border: 1px solid var(--fg);
+            padding: 9pt;
+        }
+        aside::before {
+            content: "Aside";
+            font-weight: 600;
+            padding-right: 6pt;
+        }
         button.undo::before {
             content: "⟵";
             padding: 0 4pt 0 4pt;
@@ -2953,12 +3184,6 @@
             min-width: min(400px, 100%);
         }
     </style>
-
-    <style id="varied-emphasis-styles">
-        .emph-low {
-            font-size: 0.8em;
-        }
-    </style>
 </head>
 
 <body>
@@ -2968,7 +3193,8 @@
 
             <div>
                 <figure id="ex1" class="example">
-                    <cgt-konane id="intro-game" controls="right">
+                    <!-- <cgt-value for="#ex1 cgt-konane" style="text-align: center; min-width: 3rem"></cgt-value> -->
+                    <cgt-konane>
                         xoxox
                         oxo_o
                         xo_ox
@@ -2988,7 +3214,7 @@
                 </p>
                 <div class="stack horizontal">
                     <figure id="ex2" class="example">
-                        <cgt-konane id="intro-game" controls="right">
+                        <cgt-konane>
                             _____
                             _____
                             ___ox
@@ -2998,7 +3224,7 @@
                     </figure>
 
                     <figure id="ex3" class="example">
-                        <cgt-konane id="intro-game" controls="right">
+                        <cgt-konane>
                             _____
                             _____
                             _o_ox
@@ -3016,6 +3242,39 @@
             </div>
         
         </section>
+
+
+        <seciton id="analyzing-konane">
+            <h2>Analyzing Kōnane</h2>
+
+            <p>
+                We're going to use a branch of mathematics called <i>combinatorial game theory</i> to study Kōnane.
+                This game is fun to study because it's complicated; analyzing the game solving a puzzle.
+                The trick is to come up with rules that we <em>know</em> will always be true.
+                These rules allow us to forget about all the little details, and make broad assertions about Kōnane games in general.
+                Ideally, these rules will also compose well, by referencing simple rules we can create more complex ideas.
+            </p>
+
+            <aside>
+                This is the same principle as building abstractions during software development;
+                but instead of functions and classes, we'll be dealing with statements of fact.
+            </aside>
+
+            <figure id="ex4" class="example">
+                <div class="horizontal stack">
+                    <cgt-konane>
+                        _xoxoxo_
+                    </cgt-konane>
+                    <cgt-value for="#ex4 cgt-konane" style="text-align: center; font-size: 2rem; padding: 0 12pt; min-width: 3rem"></cgt-value>
+                </div>
+                <figcaption>A "Fuzzy" Game</figcaption>
+            </figure>
+
+            <p>
+                The core of our abstraction will be game trees.
+                On top of game trees we will have game "values" - essential just names for particular patterns of game trees.
+            </p>
+        </seciton>
     </main>
 </body>
 
