@@ -23,6 +23,6 @@ jobs:
     - name: Copy walkthrough.html to www/konane.html
       run: cp ./web/walkthrough.html ./ishehadeh.github.io/www/konane.html
     - name: Commit update in GitHub pages repo
-      run: bash ./.github/scripts/push-openapi-to-notehub-js.sh
+      run: bash ./.github/scripts/push-gh-pages.sh
       env:
         BRANCH: master
